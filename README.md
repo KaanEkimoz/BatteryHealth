@@ -31,14 +31,19 @@ The limit is enforced by the battery firmware itself, so it keeps working while 
 
 ## Install
 
-Needs the Xcode command line tools (Swift 5.9+) and macOS 14+.
+Needs an Apple silicon Mac (M1 or later) on macOS 14 or newer.
 
-```bash
-scripts/build.sh release --install
-```
+1. Download **BatteryHealth-x.y.dmg** from the [latest release](https://github.com/KaanEkimoz/BatteryHealth/releases/latest).
+2. Open it and drag **BatteryHealth** onto **Applications**.
+3. Open BatteryHealth from Applications. The app isn't notarized by Apple yet, so the first time macOS says it
+   can't verify it. Click **Done**, then go to System Settings → Privacy & Security, scroll down and click
+   **Open Anyway** next to BatteryHealth. Or, in Terminal:
 
-This builds the app, copies it to `/Applications` and opens it. Click the icon in the menu bar → **Install Helper** and
-enter your admin password once. That installs a small root service, which is the only part allowed to write to the
+   ```bash
+   xattr -dr com.apple.quarantine /Applications/BatteryHealth.app
+   ```
+
+4. Click the icon in the menu bar → **Install Helper** and enter your admin password once. That installs a small root service, which is the only part allowed to write to the
 battery controller:
 
 - `/Library/PrivilegedHelperTools/com.kaanusta.batteryhealth.daemon`
@@ -51,6 +56,15 @@ independently, and with both on the battery ends up a few percent under the limi
 limit is on.
 
 To remove everything: **⋯ → Uninstall Helper…**, then delete the app.
+
+### Build from source
+
+Needs the Xcode command line tools (`xcode-select --install`, Swift 5.9+). Full Xcode isn't required.
+
+```bash
+scripts/build.sh release --install   # build, copy to /Applications and open
+scripts/make-dmg.sh                  # build build/BatteryHealth-<version>.dmg
+```
 
 ## How it works
 
