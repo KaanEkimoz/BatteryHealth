@@ -1,9 +1,19 @@
-# BatteryHealth
+<p align="center">
+  <img src="docs/icon.png" width="128" alt="BatteryHealth icon">
+</p>
+
+<h1 align="center">BatteryHealth</h1>
 
 A menu bar app that keeps an Apple silicon MacBook's battery at a charge limit, so it doesn't sit at 100% on the
 charger. Built and tested on an **M4 MacBook Air** (`Mac16,13`, battery firmware `20457.1.29`, macOS 26.7.1).
 
 The limit is enforced by the battery firmware itself, so it keeps working while the Mac sleeps or the app is closed.
+
+<p align="center">
+  <img src="docs/panel.png" width="316" alt="BatteryHealth panel, light appearance">
+  &nbsp;&nbsp;
+  <img src="docs/panel-dark.png" width="316" alt="BatteryHealth panel, dark appearance">
+</p>
 
 ## Features
 

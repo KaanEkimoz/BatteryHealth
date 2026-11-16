@@ -13,13 +13,26 @@ struct BatteryHealthApp: App {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
                 MainActor.assumeIsolated {
                     let model = AppModel()
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
                         MainActor.assumeIsolated {
-                            let r = ImageRenderer(content: PanelView(model: model).background(Color(nsColor: .windowBackgroundColor)))
-                            r.scale = 2
-                            if let img = r.nsImage, let tiff = img.tiffRepresentation,
-                               let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) {
-                                try? png.write(to: URL(fileURLWithPath: path))
+                            // Draw through a real window so AppKit-backed controls
+                            // (toggles, menus) render; ImageRenderer can't draw them.
+                            for (suffix, appearance) in [("", NSAppearance.Name.aqua), ("-dark", .darkAqua)] {
+                                let host = NSHostingView(rootView: PanelView(model: model)
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                    .background(Color(nsColor: .windowBackgroundColor).ignoresSafeArea()))
+                                host.frame.size = host.fittingSize
+                                let window = NSWindow(contentRect: host.frame, styleMask: .borderless,
+                                                      backing: .buffered, defer: false)
+                                window.appearance = NSAppearance(named: appearance)
+                                window.backgroundColor = .windowBackgroundColor
+                                window.contentView = host
+                                host.layoutSubtreeIfNeeded()
+                                host.display()
+                                guard let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds) else { continue }
+                                host.cacheDisplay(in: host.bounds, to: rep)
+                                let out = path.replacingOccurrences(of: ".png", with: "\(suffix).png")
+                                try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: out))
                             }
                             // Menu bar glyph states, light and dark bars, at 4x.
                             let states: [MenuBarGlyph.State] = [.notSetUp, .off, .holding(0.8), .charging(0.8), .heat(0.8)]
