@@ -35,16 +35,11 @@ Needs an Apple silicon Mac (M1 or later) on macOS 14 or newer.
 
 1. Download **BatteryHealth-x.y.dmg** from the [latest release](https://github.com/KaanEkimoz/BatteryHealth/releases/latest).
 2. Open it and drag **BatteryHealth** onto **Applications**.
-3. Open BatteryHealth from Applications. The app isn't notarized by Apple yet, so the first time macOS says it
-   can't verify it. Click **Done**, then go to System Settings → Privacy & Security, scroll down and click
-   **Open Anyway** next to BatteryHealth. Or, in Terminal:
+3. Open BatteryHealth from Applications. It's signed with a Developer ID and notarized by Apple, so it opens like
+   any other app.
+4. Click the icon in the menu bar → **Install Helper** and enter your admin password once.
 
-   ```bash
-   xattr -dr com.apple.quarantine /Applications/BatteryHealth.app
-   ```
-
-4. Click the icon in the menu bar → **Install Helper** and enter your admin password once. That installs a small root service, which is the only part allowed to write to the
-battery controller:
+The helper is a small root service, the only part allowed to write to the battery controller:
 
 - `/Library/PrivilegedHelperTools/com.kaanusta.batteryhealth.daemon`
 - `/Library/LaunchDaemons/com.kaanusta.batteryhealth.daemon.plist`
@@ -63,7 +58,7 @@ Needs the Xcode command line tools (`xcode-select --install`, Swift 5.9+). Full 
 
 ```bash
 scripts/build.sh release --install   # build, copy to /Applications and open
-scripts/make-dmg.sh                  # build build/BatteryHealth-<version>.dmg
+scripts/make-dmg.sh                  # build, sign and notarize build/BatteryHealth-<version>.dmg
 ```
 
 ## How it works

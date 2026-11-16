@@ -14,4 +14,17 @@ ln -s /Applications "$STAGE/Applications"
 
 rm -f "$DMG"
 hdiutil create -quiet -volname "BatteryHealth" -srcfolder "$STAGE" -fs HFS+ -format UDZO -ov "$DMG"
+
+# Sign and notarize when a Developer ID certificate and a notarytool profile exist.
+# One-time setup: xcrun notarytool store-credentials BatteryHealth
+IDENTITY="$(security find-identity -v -p codesigning | sed -n 's/.*"\(Developer ID Application: .*\)"/\1/p' | head -1)"
+if [[ -n "$IDENTITY" ]]; then
+    codesign --force --sign "$IDENTITY" --timestamp "$DMG"
+    if xcrun notarytool history --keychain-profile BatteryHealth >/dev/null 2>&1; then
+        xcrun notarytool submit "$DMG" --keychain-profile BatteryHealth --wait
+        xcrun stapler staple "$DMG"
+    else
+        echo "Not notarized: run 'xcrun notarytool store-credentials BatteryHealth' once."
+    fi
+fi
 echo "Built $DMG ($(du -h "$DMG" | cut -f1))"

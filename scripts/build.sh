@@ -16,9 +16,17 @@ cp "$BIN/batteryhealthd" "$APP/Contents/Resources/batteryhealthd"
 cp Resources/com.kaanusta.batteryhealth.daemon.plist "$APP/Contents/Resources/"
 cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 
-# Ad-hoc signature: enough to run locally on Apple silicon.
-codesign --force --sign - "$APP/Contents/Resources/batteryhealthd"
-codesign --force --sign - "$APP"
+# Developer ID + hardened runtime when the certificate is in the keychain
+# (needed for notarization); otherwise ad-hoc, enough to run locally.
+IDENTITY="$(security find-identity -v -p codesigning | sed -n 's/.*"\(Developer ID Application: .*\)"/\1/p' | head -1)"
+if [[ -n "$IDENTITY" ]]; then
+    SIGN=(--force --sign "$IDENTITY" --options runtime --timestamp)
+else
+    SIGN=(--force --sign -)
+fi
+codesign "${SIGN[@]}" "$APP/Contents/Resources/batteryhealthd"
+codesign "${SIGN[@]}" "$APP"
+echo "Signed with: ${IDENTITY:-ad-hoc}"
 echo "Built $APP"
 
 # `scripts/build.sh release --install` also copies the app into /Applications.
