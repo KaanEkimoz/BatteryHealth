@@ -17,12 +17,11 @@ struct BatteryHealthApp: App {
                         MainActor.assumeIsolated {
                             // Draw through a real window so AppKit-backed controls
                             // (toggles, menus) render; ImageRenderer can't draw them.
-                            // `--snapshot-page settings|edit` renders that state instead.
+                            // `--snapshot-page settings` renders that state instead.
                             let pageArg = args.firstIndex(of: "--snapshot-page").map { args[$0 + 1] } ?? "main"
                             for (suffix, appearance) in [("", NSAppearance.Name.aqua), ("-dark", .darkAqua)] {
                                 let host = NSHostingView(rootView: PanelView(model: model,
-                                                                             page: pageArg == "settings" ? .settings : .main,
-                                                                             editing: pageArg == "edit")
+                                                                             page: pageArg == "settings" ? .settings : .main)
                                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                                     .background(Color(nsColor: .windowBackgroundColor).ignoresSafeArea()))
                                 host.frame.size = host.fittingSize

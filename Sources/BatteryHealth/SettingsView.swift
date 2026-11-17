@@ -6,7 +6,8 @@ import BatteryKit
 struct SettingsView: View {
     @ObservedObject var model: AppModel
     let onBack: () -> Void
-    let onEditPanel: () -> Void
+    @AppStorage(PanelLayout.hiddenKey) private var hiddenRaw = ""
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(alignment: .leading, spacing: Metrics.gap) {
@@ -46,26 +47,22 @@ struct SettingsView: View {
                 }
             }
 
-            SettingsGroup("Panel") {
-                Button(action: onEditPanel) {
-                    HStack {
-                        Text("Edit Panel").font(.system(size: 12))
-                        Spacer()
-                        Text("Hide or show sections")
-                            .font(.system(size: 11))
-                            .foregroundStyle(.secondary)
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(.tertiary)
+            SettingsGroup("Show in Panel",
+                          footer: "Hover over a section to hide it with −, add it back with + at the bottom of the panel, and drag stats to reorder them.") {
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: 6), GridItem(.flexible(), spacing: 6)], spacing: 6) {
+                    ForEach(PanelItem.allCases, id: \.self) { item in
+                        PanelChip(item: item, isOn: !layout.isHidden(item)) {
+                            var l = layout
+                            l.setHidden(item, !l.isHidden(item))
+                            withAnimation(reduceMotion ? .easeInOut(duration: 0.15) : calm) { hiddenRaw = l.hiddenRaw }
+                        }
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 9)
-                    .contentShape(Rectangle())
                 }
-                .buttonStyle(RowPressStyle())
+                .padding(8)
             }
 
-            SettingsGroup("Helper") {
+            SettingsGroup("Charge Control",
+                          footer: "A small background service writes your limit to the battery firmware, so it keeps working while the Mac sleeps or this app is closed. Setting it up asks for your password once.") {
                 HStack(spacing: 6) {
                     Circle().fill(helperColor).frame(width: 6, height: 6)
                     Text(helperText).font(.system(size: 12))
@@ -75,13 +72,13 @@ struct SettingsView: View {
                 .padding(.vertical, 9)
                 Divider().padding(.leading, 12)
                 if model.installed {
-                    ActionRow(title: "Restore Stock Charging") { model.resetToStock() }
+                    ActionRow(title: "Turn Off and Use macOS Charging") { model.resetToStock() }
                     Divider().padding(.leading, 12)
-                    ActionRow(title: model.needsDaemonUpdate ? "Update Helper…" : "Reinstall Helper…") { model.installDaemon() }
+                    ActionRow(title: model.needsDaemonUpdate ? "Update Charge Control…" : "Repair Charge Control…") { model.installDaemon() }
                     Divider().padding(.leading, 12)
-                    ActionRow(title: "Uninstall Helper…", role: .destructive) { model.uninstallDaemon() }
+                    ActionRow(title: "Remove Charge Control…", role: .destructive) { model.uninstallDaemon() }
                 } else {
-                    ActionRow(title: "Install Helper…") { model.installDaemon() }
+                    ActionRow(title: "Set Up Charge Control…") { model.installDaemon() }
                 }
             }
 
@@ -94,8 +91,9 @@ struct SettingsView: View {
                     .keyboardShortcut("q")
                     .controlSize(.small)
             }
-            .padding(.horizontal, 6)
-            .padding(.bottom, 2)
+            .padding(.horizontal, 4)
+            .padding(.top, 2)
+            .padding(.bottom, 6)
         }
     }
 
@@ -121,6 +119,8 @@ struct SettingsView: View {
         .padding(.bottom, 2)
     }
 
+    private var layout: PanelLayout { PanelLayout(hiddenRaw: hiddenRaw, orderRaw: "") }
+
     private var version: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
     }
@@ -131,10 +131,10 @@ struct SettingsView: View {
     }
 
     private var helperText: String {
-        guard model.installed else { return "Helper not installed" }
-        guard model.daemon != nil else { return "Helper not responding" }
-        if model.needsDaemonUpdate { return "Helper update available" }
-        return "Helper running"
+        guard model.installed else { return "Not set up" }
+        guard model.daemon != nil else { return "Not responding" }
+        if model.needsDaemonUpdate { return "Update available" }
+        return "Active"
     }
 
     private func binding<T>(_ kp: WritableKeyPath<ChargeConfig, T>) -> Binding<T> {
@@ -145,10 +145,12 @@ struct SettingsView: View {
 /// A titled group of rows in one module, like a grouped list in System Settings.
 private struct SettingsGroup<Content: View>: View {
     let title: String
+    var footer: String?
     @ViewBuilder var content: Content
 
-    init(_ title: String, @ViewBuilder content: () -> Content) {
+    init(_ title: String, footer: String? = nil, @ViewBuilder content: () -> Content) {
         self.title = title
+        self.footer = footer
         self.content = content()
     }
 
@@ -168,6 +170,14 @@ private struct SettingsGroup<Content: View>: View {
                     RoundedRectangle(cornerRadius: Metrics.module, style: .continuous)
                         .strokeBorder(.primary.opacity(0.05), lineWidth: 0.5)
                 )
+            if let footer {
+                Text(footer)
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 12)
+                    .padding(.top, 2)
+            }
         }
     }
 }
@@ -212,6 +222,42 @@ private struct ActionRow: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(RowPressStyle())
+    }
+}
+
+/// A toggle chip: filled while the item is on the panel.
+private struct PanelChip: View {
+    let item: PanelItem
+    let isOn: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: item.symbol)
+                    .font(.system(size: 11, weight: .medium))
+                    .frame(width: 14)
+                Text(item.title)
+                    .font(.system(size: 11.5, weight: isOn ? .medium : .regular))
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+                Image(systemName: isOn ? "checkmark" : "plus")
+                    .font(.system(size: 9.5, weight: .bold))
+                    .foregroundStyle(isOn ? Color.white.opacity(0.9) : Color.secondary)
+            }
+            .foregroundStyle(isOn ? Color.white : Color.primary)
+            .padding(.horizontal, 9)
+            .frame(height: 28)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(isOn ? AnyShapeStyle(Color.accentColor.gradient) : AnyShapeStyle(Color.primary.opacity(0.06)))
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
+        .buttonStyle(PressStyle())
+        .accessibilityLabel(item.title)
+        .accessibilityValue(isOn ? "Shown" : "Hidden")
+        .accessibilityAddTraits(isOn ? .isSelected : [])
     }
 }
 

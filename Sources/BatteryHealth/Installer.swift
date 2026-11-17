@@ -27,7 +27,7 @@ enum Installer {
         install -d -o root -g wheel -m 755 \(q(BatteryHealthIDs.configDir))
         launchctl bootstrap system \(q(BatteryHealthIDs.plistPath))
         """
-        return runAsAdmin(script, prompt: "BatteryHealth needs to install its charging helper.")
+        return runAsAdmin(script, prompt: "BatteryHealth wants to set up charge control.")
     }
 
     static func uninstall() -> String? {
@@ -37,7 +37,7 @@ enum Installer {
         launchctl bootout system/\(label) 2>/dev/null || true
         rm -f \(q(BatteryHealthIDs.plistPath)) \(q(BatteryHealthIDs.daemonPath))
         """
-        return runAsAdmin(script, prompt: "BatteryHealth needs to remove its charging helper.")
+        return runAsAdmin(script, prompt: "BatteryHealth wants to remove charge control.")
     }
 
     private static func runAsAdmin(_ shell: String, prompt: String) -> String? {

@@ -16,22 +16,28 @@ let calm = Animation.spring(response: 0.35, dampingFraction: 1)
 struct PanelView: View {
     @ObservedObject var model: AppModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @AppStorage(PanelLayout.key) private var hiddenRaw = ""
+    @AppStorage(PanelLayout.hiddenKey) private var hiddenRaw = ""
+    @AppStorage(PanelLayout.orderKey) private var orderRaw = ""
     @State var page: Page = .main
-    @State var editing = false
+    @State private var dragging: PanelItem?
 
     enum Page { case main, settings }
 
-    private var layout: PanelLayout { PanelLayout(raw: hiddenRaw) }
+    private var layout: PanelLayout { PanelLayout(hiddenRaw: hiddenRaw, orderRaw: orderRaw) }
     private var motion: Animation { reduceMotion ? .easeInOut(duration: 0.15) : calm }
 
-    /// Shown normally, or always while editing (hidden ones dimmed with a +).
-    private func shows(_ item: PanelItem) -> Bool { editing || !layout.isHidden(item) }
+    private func shows(_ item: PanelItem) -> Bool { !layout.isHidden(item) }
 
-    private func toggle(_ item: PanelItem) {
+    private func setHidden(_ item: PanelItem, _ hide: Bool) {
         var l = layout
-        l.toggle(item)
-        withAnimation(motion) { hiddenRaw = l.raw }
+        l.setHidden(item, hide)
+        withAnimation(motion) { hiddenRaw = l.hiddenRaw }
+    }
+
+    private func move(_ item: PanelItem, to target: PanelItem) {
+        var l = layout
+        l.move(item, to: target)
+        withAnimation(motion) { orderRaw = l.orderRaw }
     }
 
     var body: some View {
@@ -41,9 +47,7 @@ struct PanelView: View {
                 mainPage
                     .transition(reduceMotion ? .opacity : .move(edge: .leading).combined(with: .opacity))
             case .settings:
-                SettingsView(model: model,
-                             onBack: { withAnimation(motion) { page = .main } },
-                             onEditPanel: { withAnimation(motion) { page = .main; editing = true } })
+                SettingsView(model: model, onBack: { withAnimation(motion) { page = .main } })
                     .transition(reduceMotion ? .opacity : .move(edge: .trailing).combined(with: .opacity))
             }
         }
@@ -60,22 +64,22 @@ struct PanelView: View {
             hero
             if !model.installed {
                 InstallModule(busy: model.busy, title: "Set up charge limiting",
-                              detail: "Installs a small helper that writes your limit straight to the battery firmware. It keeps working while the Mac sleeps or this app is closed.",
-                              button: "Install Helper") { model.installDaemon() }
+                              detail: "BatteryHealth adds a small background service that writes your limit to the battery firmware, so it keeps working while the Mac sleeps or this app is closed. You’ll be asked for your password once.",
+                              button: "Set Up…") { model.installDaemon() }
             } else if model.daemon == nil {
-                InstallModule(busy: model.busy, title: "Helper isn’t responding",
-                              detail: model.daemonError ?? "The background helper didn’t answer.",
-                              button: "Reinstall Helper") { model.installDaemon() }
+                InstallModule(busy: model.busy, title: "Charge control isn’t responding",
+                              detail: model.daemonError ?? "The background service didn’t answer.",
+                              button: "Repair…") { model.installDaemon() }
             } else {
                 if let l = model.macOSLimit, model.config.limitEnabled { macOSLimitWarning(l) }
                 limitModule
                 if shows(.powerFlow), let b = model.battery {
                     PowerFlowModule(battery: b)
-                        .editable(.powerFlow, editing: editing, layout: layout) { toggle(.powerFlow) }
+                        .hoverRemovable(.powerFlow) { setHidden(.powerFlow, true) }
                 }
                 if shows(.quickActions) {
                     quickActions
-                        .editable(.quickActions, editing: editing, layout: layout) { toggle(.quickActions) }
+                        .hoverRemovable(.quickActions) { setHidden(.quickActions, true) }
                 }
             }
             if PanelItem.stats.contains(where: shows) { healthModule }
@@ -123,7 +127,7 @@ struct PanelView: View {
 
     private var headline: String {
         if let s = model.daemon?.state, !s.isEmpty { return s }
-        return model.installed ? "Helper not responding" : "Charge limit not set up"
+        return model.installed ? "Charge control not responding" : "Charge limit not set up"
     }
 
     private var powerLine: String {
@@ -246,7 +250,9 @@ struct PanelView: View {
         if let up = model.uptime {
             all.append(StatItem(item: .uptime, value: up.shortText, detail: uptimeDetail(up)))
         }
+        let order = layout.statOrder
         return all.filter { shows($0.item) }
+            .sorted { order.firstIndex(of: $0.item)! < order.firstIndex(of: $1.item)! }
     }
 
     private var healthModule: some View {
@@ -258,7 +264,23 @@ struct PanelView: View {
                         GridRow {
                             ForEach(items[i..<min(i + 2, items.count)]) { s in
                                 Stat(label: s.item.title, value: s.value, detail: s.detail)
-                                    .editable(s.item, editing: editing, layout: layout, badgeSize: 16, inset: true) { toggle(s.item) }
+                                    .padding(4)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                            .fill(.primary.opacity(dragging == s.item ? 0.08 : 0))
+                                    )
+                                    .padding(-4)
+                                    .opacity(dragging == s.item ? 0.5 : 1)
+                                    .contentShape(Rectangle())
+                                    .hoverRemovable(s.item, alignment: .topTrailing, badgeSize: 16, outside: false) {
+                                        setHidden(s.item, true)
+                                    }
+                                    .onDrag {
+                                        dragging = s.item
+                                        return NSItemProvider(object: s.item.rawValue as NSString)
+                                    }
+                                    .onDrop(of: [.text], delegate: StatDropDelegate(target: s.item, dragging: $dragging,
+                                                                                    move: move))
                             }
                             if i + 1 == items.count {
                                 Color.clear.gridCellUnsizedAxes([.horizontal, .vertical])
@@ -302,35 +324,53 @@ struct PanelView: View {
 
     private var footer: some View {
         HStack(spacing: 6) {
-            if editing {
-                Text("Hide with −, bring back with +")
-                    .font(.system(size: 11))
+            addMenu
+            Spacer()
+            Button { withAnimation(motion) { page = .settings } } label: {
+                Image(systemName: "gearshape")
+                    .font(.system(size: 14))
                     .foregroundStyle(.secondary)
-                    .transition(.opacity)
-                Spacer()
-                Button("Done") { withAnimation(motion) { editing = false } }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
-                    .keyboardShortcut(.defaultAction)
-                    .transition(.opacity)
-            } else {
-                Spacer()
-                Button { withAnimation(motion) { page = .settings } } label: {
-                    Image(systemName: "gearshape")
-                        .font(.system(size: 14))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 24, height: 24)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(PressStyle())
-                .help("Settings")
-                .accessibilityLabel("Settings")
-                .keyboardShortcut(",", modifiers: .command)
+                    .frame(width: 24, height: 24)
+                    .contentShape(Rectangle())
             }
+            .buttonStyle(PressStyle())
+            .help("Settings")
+            .accessibilityLabel("Settings")
+            .keyboardShortcut(",", modifiers: .command)
         }
-        .padding(.horizontal, 6)
-        .padding(.bottom, 2)
+        .padding(.horizontal, 4)
+        .padding(.top, 2)
+        .padding(.bottom, 6)
         .frame(minHeight: 24)
+    }
+
+    /// + lists what's been hidden; picking one brings it back.
+    private var addMenu: some View {
+        let hidden = PanelItem.allCases.filter(layout.isHidden)
+        return Menu {
+            if hidden.isEmpty {
+                Text("Everything is on the panel")
+            } else {
+                Section("Add to Panel") {
+                    ForEach(hidden, id: \.self) { item in
+                        Button { setHidden(item, false) } label: {
+                            Label(item.title, systemImage: item.symbol)
+                        }
+                    }
+                }
+            }
+        } label: {
+            Image(systemName: "plus")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.secondary)
+                .frame(width: 24, height: 24)
+                .contentShape(Rectangle())
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help(hidden.isEmpty ? "Everything is on the panel" : "Add to panel")
+        .accessibilityLabel("Add to panel")
     }
 
     private func binding<T>(_ kp: WritableKeyPath<ChargeConfig, T>) -> Binding<T> {
