@@ -4,20 +4,58 @@ import BatteryKit
 // Control Center–style panel: grouped modules on the menu bar material,
 // one hero number, direct-manipulation limit slider, round quick toggles.
 
-private enum Metrics {
+enum Metrics {
     static let width: CGFloat = 316
     static let module: CGFloat = 14     // module corner radius
     static let gap: CGFloat = 10
 }
 
 /// Critically damped by default: nothing here was flicked, so nothing bounces.
-private let calm = Animation.spring(response: 0.35, dampingFraction: 1)
+let calm = Animation.spring(response: 0.35, dampingFraction: 1)
 
 struct PanelView: View {
     @ObservedObject var model: AppModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AppStorage(PanelLayout.key) private var hiddenRaw = ""
+    @State var page: Page = .main
+    @State var editing = false
+
+    enum Page { case main, settings }
+
+    private var layout: PanelLayout { PanelLayout(raw: hiddenRaw) }
+    private var motion: Animation { reduceMotion ? .easeInOut(duration: 0.15) : calm }
+
+    /// Shown normally, or always while editing (hidden ones dimmed with a +).
+    private func shows(_ item: PanelItem) -> Bool { editing || !layout.isHidden(item) }
+
+    private func toggle(_ item: PanelItem) {
+        var l = layout
+        l.toggle(item)
+        withAnimation(motion) { hiddenRaw = l.raw }
+    }
 
     var body: some View {
+        ZStack(alignment: .top) {
+            switch page {
+            case .main:
+                mainPage
+                    .transition(reduceMotion ? .opacity : .move(edge: .leading).combined(with: .opacity))
+            case .settings:
+                SettingsView(model: model,
+                             onBack: { withAnimation(motion) { page = .main } },
+                             onEditPanel: { withAnimation(motion) { page = .main; editing = true } })
+                    .transition(reduceMotion ? .opacity : .move(edge: .trailing).combined(with: .opacity))
+            }
+        }
+        .padding(12)
+        .frame(width: Metrics.width)
+        .clipped()
+        .animation(reduceMotion ? .easeInOut(duration: 0.15) : calm, value: model.config)
+        .animation(reduceMotion ? .easeInOut(duration: 0.15) : calm, value: model.battery?.percent)
+        .onAppear { model.refresh() }
+    }
+
+    private var mainPage: some View {
         VStack(spacing: Metrics.gap) {
             hero
             if !model.installed {
@@ -31,18 +69,19 @@ struct PanelView: View {
             } else {
                 if let l = model.macOSLimit, model.config.limitEnabled { macOSLimitWarning(l) }
                 limitModule
-                if let b = model.battery { PowerFlowModule(battery: b) }
-                quickActions
+                if shows(.powerFlow), let b = model.battery {
+                    PowerFlowModule(battery: b)
+                        .editable(.powerFlow, editing: editing, layout: layout) { toggle(.powerFlow) }
+                }
+                if shows(.quickActions) {
+                    quickActions
+                        .editable(.quickActions, editing: editing, layout: layout) { toggle(.quickActions) }
+                }
             }
-            healthModule
+            if PanelItem.stats.contains(where: shows) { healthModule }
             if let msg = model.message { messageRow(msg) }
             footer
         }
-        .padding(12)
-        .frame(width: Metrics.width)
-        .animation(reduceMotion ? .easeInOut(duration: 0.15) : calm, value: model.config)
-        .animation(reduceMotion ? .easeInOut(duration: 0.15) : calm, value: model.battery?.percent)
-        .onAppear { model.refresh() }
     }
 
     // MARK: Hero
@@ -186,26 +225,44 @@ struct PanelView: View {
         return f.string(from: up.bootDate)
     }
 
+    private struct StatItem: Identifiable {
+        let item: PanelItem
+        let value: String
+        let detail: String
+        var id: PanelItem { item }
+    }
+
+    private func statItems(_ b: BatterySnapshot) -> [StatItem] {
+        let macOS = model.macOSHealth
+        var all = [
+            StatItem(item: .health, value: macOS?.maximumCapacityPercent.map { "\($0)%" } ?? "—",
+                     detail: macOS?.condition ?? "System Settings"),
+            StatItem(item: .capacity, value: "\(b.rawMaxCapacity) mAh",
+                     detail: String(format: "%.1f%% of %d", b.healthPercent, b.designCapacity)),
+            StatItem(item: .cycles, value: "\(b.cycleCount)", detail: "of 1000 rated"),
+            StatItem(item: .temperature, value: String(format: "%.1f°", b.temperatureC),
+                     detail: b.temperatureC >= 35 ? "Warm" : "Normal"),
+        ]
+        if let up = model.uptime {
+            all.append(StatItem(item: .uptime, value: up.shortText, detail: uptimeDetail(up)))
+        }
+        return all.filter { shows($0.item) }
+    }
+
     private var healthModule: some View {
         Module {
             if let b = model.battery {
-                let macOS = model.macOSHealth
+                let items = statItems(b)
                 Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 12) {
-                    GridRow {
-                        Stat(label: "Health", value: macOS?.maximumCapacityPercent.map { "\($0)%" } ?? "—",
-                             detail: macOS?.condition ?? "System Settings")
-                        Stat(label: "Capacity", value: "\(b.rawMaxCapacity) mAh",
-                             detail: String(format: "%.1f%% of %d", b.healthPercent, b.designCapacity))
-                    }
-                    GridRow {
-                        Stat(label: "Cycles", value: "\(b.cycleCount)", detail: "of 1000 rated")
-                        Stat(label: "Temperature", value: String(format: "%.1f°", b.temperatureC),
-                             detail: b.temperatureC >= 35 ? "Warm" : "Normal")
-                    }
-                    if let up = model.uptime {
+                    ForEach(Array(stride(from: 0, to: items.count, by: 2)), id: \.self) { i in
                         GridRow {
-                            Stat(label: "Uptime", value: up.shortText, detail: uptimeDetail(up))
-                            Color.clear.gridCellUnsizedAxes([.horizontal, .vertical])
+                            ForEach(items[i..<min(i + 2, items.count)]) { s in
+                                Stat(label: s.item.title, value: s.value, detail: s.detail)
+                                    .editable(s.item, editing: editing, layout: layout, badgeSize: 16, inset: true) { toggle(s.item) }
+                            }
+                            if i + 1 == items.count {
+                                Color.clear.gridCellUnsizedAxes([.horizontal, .vertical])
+                            }
                         }
                     }
                 }
@@ -245,61 +302,35 @@ struct PanelView: View {
 
     private var footer: some View {
         HStack(spacing: 6) {
-            Circle()
-                .fill(statusColor)
-                .frame(width: 6, height: 6)
-            Text(statusText)
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-            Spacer()
-            Menu {
-                Toggle("Open at Login", isOn: Binding(get: { model.launchAtLogin }, set: { model.setLaunchAtLogin($0) }))
-                Toggle("Remind to Restart After \(RestartReminder.thresholdHours) Hours",
-                       isOn: Binding(get: { model.restartReminderEnabled }, set: { model.setRestartReminder($0) }))
-                if model.installed {
-                    Toggle("MagSafe LED Shows Limit", isOn: binding(\.controlMagSafeLED))
-                }
-                if model.installed {
-                    Picker("Heat Guard Threshold", selection: binding(\.heatLimitC)) {
-                        Text("35°C").tag(35.0); Text("38°C").tag(38.0); Text("40°C").tag(40.0)
-                    }
-                    Divider()
-                    Button("Restore Stock Charging") { model.resetToStock() }
-                    Button(model.needsDaemonUpdate ? "Update Helper…" : "Reinstall Helper…") { model.installDaemon() }
-                    Button("Uninstall Helper…") { model.uninstallDaemon() }
-                }
-                Divider()
-                Button("Quit BatteryHealth") { NSApplication.shared.terminate(nil) }
-                    .keyboardShortcut("q")
-            } label: {
-                Image(systemName: "ellipsis.circle")
-                    .font(.system(size: 15))
+            if editing {
+                Text("Hide with −, bring back with +")
+                    .font(.system(size: 11))
                     .foregroundStyle(.secondary)
+                    .transition(.opacity)
+                Spacer()
+                Button("Done") { withAnimation(motion) { editing = false } }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                    .keyboardShortcut(.defaultAction)
+                    .transition(.opacity)
+            } else {
+                Spacer()
+                Button { withAnimation(motion) { page = .settings } } label: {
+                    Image(systemName: "gearshape")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 24, height: 24)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(PressStyle())
+                .help("Settings")
+                .accessibilityLabel("Settings")
+                .keyboardShortcut(",", modifiers: .command)
             }
-            .menuStyle(.borderlessButton)
-            .menuIndicator(.hidden)
-            .fixedSize()
         }
         .padding(.horizontal, 6)
         .padding(.bottom, 2)
-    }
-
-    private var statusColor: Color {
-        guard let d = model.daemon else { return model.installed ? .orange : .secondary }
-        if d.lastError != nil { return .orange }
-        return d.config.limitEnabled ? .green : .secondary
-    }
-
-    private var statusText: String {
-        guard let d = model.daemon else { return model.installed ? "Helper offline" : "Not set up" }
-        if model.needsDaemonUpdate { return "Helper update available" }
-        switch d.backend {
-        case .firmwareRange:
-            if let r = d.firmwareRange, r.active { return "Firmware limit \(r.lower)–\(r.upper)%" }
-            return "Firmware limit off"
-        case .legacyInhibit: return d.config.limitEnabled ? "Software limit active" : "Limit off"
-        case .unsupported: return "Not supported on this firmware"
-        }
+        .frame(minHeight: 24)
     }
 
     private func binding<T>(_ kp: WritableKeyPath<ChargeConfig, T>) -> Binding<T> {
@@ -310,7 +341,7 @@ struct PanelView: View {
 // MARK: - Components
 
 /// A Control Center module: a soft, slightly raised tile on the panel material.
-private struct Module<Content: View>: View {
+struct Module<Content: View>: View {
     @ViewBuilder var content: Content
     var body: some View {
         content
@@ -501,7 +532,7 @@ private struct QuickToggle: View {
 }
 
 /// Feedback on press, not release.
-private struct PressStyle: ButtonStyle {
+struct PressStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.94 : 1)

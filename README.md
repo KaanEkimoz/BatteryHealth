@@ -29,6 +29,7 @@ The limit is enforced by the battery firmware itself, so it keeps working while 
   and the charger is always reconnected before sleep.
 - **Health.** Maximum capacity as macOS reports it, plus the raw measured capacity, cycle count and temperature.
 - **Uptime.** How long the Mac has been on since its last restart, with an optional reminder to restart after 72 hours.
+- **Your panel, your way.** Settings → Edit Panel hides Power Flow, Quick Actions or any single stat; bring them back the same way.
 
 ## Install
 
@@ -51,7 +52,7 @@ The helper is a small root service, the only part allowed to write to the batter
 independently, and with both on the battery ends up a few percent under the limit. The panel warns you when macOS's
 limit is on.
 
-To remove everything: **⋯ → Uninstall Helper…**, then delete the app.
+To remove everything: **⚙ Settings → Uninstall Helper…**, then delete the app.
 
 ### Build from source
 
@@ -117,7 +118,7 @@ Without the app: `sudo scripts/install-daemon.sh` / `sudo scripts/uninstall-daem
 
 - **macOS's own limit** (macOS 26.4+) is a separate gate, and the lower of the two wins. macOS also charges to 100%
   every few weeks to recalibrate. The firmware range set here is independent of that.
-- **Quitting the app doesn't remove the limit**, because it lives in the firmware. Use **⋯ → Restore Stock Charging**
+- **Quitting the app doesn't remove the limit**, because it lives in the firmware. Use **⚙ Settings → Restore Stock Charging**
   or `batteryhealthd reset` for that.
 - On **macOS 27 beta 4+** firmware, Apple locks these keys behind a private entitlement, so even root gets
   `kIOReturnNotPrivileged`. If that reaches this Mac, the panel shows the write error.
