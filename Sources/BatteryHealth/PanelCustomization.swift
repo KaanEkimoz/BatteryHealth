@@ -3,10 +3,10 @@ import SwiftUI
 /// Parts of the panel people can hide. The charge limit itself always stays.
 enum PanelItem: String, CaseIterable {
     case powerFlow, quickActions
-    case health, capacity, cycles, temperature, uptime
+    case health, capacity, cycles, temperature, uptime, timeLeft
 
     static let modules: [PanelItem] = [.powerFlow, .quickActions]
-    static let stats: [PanelItem] = [.health, .capacity, .cycles, .temperature, .uptime]
+    static let stats: [PanelItem] = [.health, .capacity, .cycles, .temperature, .uptime, .timeLeft]
 
     var title: String {
         switch self {
@@ -17,6 +17,7 @@ enum PanelItem: String, CaseIterable {
         case .cycles: "Cycles"
         case .temperature: "Temperature"
         case .uptime: "Uptime"
+        case .timeLeft: "Time Left"
         }
     }
 
@@ -29,6 +30,7 @@ enum PanelItem: String, CaseIterable {
         case .cycles: "arrow.triangle.2.circlepath"
         case .temperature: "thermometer.medium"
         case .uptime: "clock"
+        case .timeLeft: "hourglass"
         }
     }
 }

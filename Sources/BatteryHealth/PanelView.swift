@@ -235,6 +235,27 @@ struct PanelView: View {
         return f.string(from: up.bootDate)
     }
 
+    private static func duration(_ minutes: Int) -> String {
+        minutes >= 60 ? "\(minutes / 60) h \(minutes % 60) m" : "\(minutes) m"
+    }
+
+    /// On battery: macOS's estimate. Charging: time to the limit (or 100%),
+    /// from the charge still missing and the current flowing in.
+    private func timeLeft(_ b: BatterySnapshot) -> (value: String, detail: String) {
+        if !b.externalConnected {
+            guard let m = b.timeRemainingMinutes else { return ("—", "Calculating…") }
+            return (Self.duration(m), "on battery")
+        }
+        let target = model.config.limitEnabled && !model.config.topUpToFull ? model.config.upperLimit : 100
+        if b.isCharging, b.amperageA > 0.05, b.percent < target {
+            let missingmAh = Double(target - b.percent) / 100 * Double(max(b.nominalCapacity, b.rawMaxCapacity))
+            let minutes = Int((missingmAh / (b.amperageA * 1000) * 60).rounded(.up))
+            return (Self.duration(max(1, minutes)), "to \(target)%")
+        }
+        if b.isCharging { return ("—", "Calculating…") }
+        return b.percent >= target - 1 ? ("Held", "at \(target)% on power") : ("—", "on power adapter")
+    }
+
     private struct StatItem: Identifiable {
         let item: PanelItem
         let value: String
@@ -256,6 +277,8 @@ struct PanelView: View {
         if let up = model.uptime {
             all.append(StatItem(item: .uptime, value: up.shortText, detail: uptimeDetail(up)))
         }
+        let t = timeLeft(b)
+        all.append(StatItem(item: .timeLeft, value: t.value, detail: t.detail))
         let order = layout.statOrder
         return all.filter { shows($0.item) }
             .sorted { order.firstIndex(of: $0.item)! < order.firstIndex(of: $1.item)! }
