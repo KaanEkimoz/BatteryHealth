@@ -77,7 +77,7 @@ struct PanelLayout {
 /// button on a macOS notification. The item stays fully usable underneath.
 struct HoverRemovable: ViewModifier {
     let item: PanelItem
-    var alignment: Alignment = .topLeading
+    var alignment: Alignment = .topTrailing
     var badgeSize: CGFloat = 18
     /// Pull the badge half outside the item's corner (for big modules).
     var outside = true
@@ -118,7 +118,7 @@ struct HoverRemovable: ViewModifier {
 }
 
 extension View {
-    func hoverRemovable(_ item: PanelItem, alignment: Alignment = .topLeading, badgeSize: CGFloat = 18,
+    func hoverRemovable(_ item: PanelItem, alignment: Alignment = .topTrailing, badgeSize: CGFloat = 18,
                         outside: Bool = true, remove: @escaping () -> Void) -> some View {
         modifier(HoverRemovable(item: item, alignment: alignment, badgeSize: badgeSize,
                                 outside: outside, remove: remove))
