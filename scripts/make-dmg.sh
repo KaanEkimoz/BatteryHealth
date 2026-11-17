@@ -9,7 +9,7 @@ DMG="build/BatteryHealth-$VERSION.dmg"
 
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
-ditto build/BatteryHealth.app "$STAGE/BatteryHealth.app"
+ditto build/app.noindex/BatteryHealth.app "$STAGE/BatteryHealth.app"
 ln -s /Applications "$STAGE/Applications"
 
 rm -f "$DMG"

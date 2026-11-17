@@ -28,6 +28,7 @@ The limit is enforced by the battery firmware itself, so it keeps working while 
 - **Discharge.** Run from the battery while plugged in until it's down to the limit. Idle sleep is blocked meanwhile,
   and the charger is always reconnected before sleep.
 - **Health.** Maximum capacity as macOS reports it, plus the raw measured capacity, cycle count and temperature.
+- **Uptime.** How long the Mac has been on since its last restart, with an optional reminder to restart after 72 hours.
 
 ## Install
 

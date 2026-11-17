@@ -1,5 +1,5 @@
 #!/bin/bash
-# Builds build/BatteryHealth.app (menu bar app with the daemon embedded).
+# Builds build/app.noindex/BatteryHealth.app (menu bar app with the daemon embedded).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -7,7 +7,8 @@ CONFIG="${1:-release}"
 swift build -c "$CONFIG" --arch arm64
 BIN="$(swift build -c "$CONFIG" --arch arm64 --show-bin-path)"
 
-APP=build/BatteryHealth.app
+# .noindex keeps Spotlight and Launchpad from listing a second copy.
+APP=build/app.noindex/BatteryHealth.app
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp Resources/Info.plist "$APP/Contents/Info.plist"

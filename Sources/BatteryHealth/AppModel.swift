@@ -17,6 +17,9 @@ final class AppModel: ObservableObject {
     @Published var message: String?
     @Published var installed = Installer.isInstalled
     @Published var launchAtLogin = SMAppService.mainApp.status == .enabled
+    @Published var uptime = Uptime.read()
+    private let restartReminder = RestartReminder()
+    @Published var restartReminderEnabled: Bool
 
     private let client = DaemonClient()
     private var timer: Timer?
@@ -26,6 +29,15 @@ final class AppModel: ObservableObject {
 
     init() {
         config = ChargeConfig.load()
+        restartReminderEnabled = restartReminder.isEnabled
+        if restartReminderEnabled { restartReminder.requestPermission() }
+        // Debug aid: `open -a BatteryHealth --args --test-restart-reminder`.
+        if CommandLine.arguments.contains("--test-restart-reminder") {
+            let reminder = restartReminder
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                MainActor.assumeIsolated { reminder.post(days: 3) }
+            }
+        }
         refresh()
         timer = Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.refresh() }
@@ -39,6 +51,8 @@ final class AppModel: ObservableObject {
 
     func refresh() {
         battery = BatterySnapshot.read()
+        uptime = Uptime.read()
+        restartReminder.check(uptime)
         // macOS updates its figure rarely; system_profiler is cheap but not free.
         if Date().timeIntervalSince(macOSHealthReadAt) > 600 {
             macOSHealthReadAt = Date()
@@ -113,6 +127,12 @@ final class AppModel: ObservableObject {
         if let url = URL(string: "x-apple.systempreferences:com.apple.Battery-Settings.extension") {
             NSWorkspace.shared.open(url)
         }
+    }
+
+    func setRestartReminder(_ on: Bool) {
+        restartReminder.isEnabled = on
+        restartReminderEnabled = on
+        if on { restartReminder.check(uptime) }
     }
 
     func setLaunchAtLogin(_ on: Bool) {

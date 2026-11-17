@@ -179,6 +179,13 @@ struct PanelView: View {
 
     // MARK: Health
 
+    private func uptimeDetail(_ up: Uptime) -> String {
+        if up.hours >= RestartReminder.thresholdHours { return "Restart recommended" }
+        let f = DateFormatter()
+        f.dateFormat = Calendar.current.isDateInToday(up.bootDate) ? "'since' HH:mm" : "'since' EEE HH:mm"
+        return f.string(from: up.bootDate)
+    }
+
     private var healthModule: some View {
         Module {
             if let b = model.battery {
@@ -194,6 +201,12 @@ struct PanelView: View {
                         Stat(label: "Cycles", value: "\(b.cycleCount)", detail: "of 1000 rated")
                         Stat(label: "Temperature", value: String(format: "%.1f°", b.temperatureC),
                              detail: b.temperatureC >= 35 ? "Warm" : "Normal")
+                    }
+                    if let up = model.uptime {
+                        GridRow {
+                            Stat(label: "Uptime", value: up.shortText, detail: uptimeDetail(up))
+                            Color.clear.gridCellUnsizedAxes([.horizontal, .vertical])
+                        }
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -241,6 +254,8 @@ struct PanelView: View {
             Spacer()
             Menu {
                 Toggle("Open at Login", isOn: Binding(get: { model.launchAtLogin }, set: { model.setLaunchAtLogin($0) }))
+                Toggle("Remind to Restart After \(RestartReminder.thresholdHours) Hours",
+                       isOn: Binding(get: { model.restartReminderEnabled }, set: { model.setRestartReminder($0) }))
                 if model.installed {
                     Toggle("MagSafe LED Shows Limit", isOn: binding(\.controlMagSafeLED))
                 }
