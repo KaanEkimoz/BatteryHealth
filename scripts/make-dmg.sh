@@ -27,4 +27,7 @@ if [[ -n "$IDENTITY" ]]; then
         echo "Not notarized: run 'xcrun notarytool store-credentials BatteryHealth' once."
     fi
 fi
+# Same file under a fixed name, so the README's
+# releases/latest/download/BatteryHealth.dmg link works for every version.
+cp "$DMG" build/BatteryHealth.dmg
 echo "Built $DMG ($(du -h "$DMG" | cut -f1))"

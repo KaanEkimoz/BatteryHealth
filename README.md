@@ -4,10 +4,15 @@
 
 <h1 align="center">BatteryHealth</h1>
 
-A menu bar app that keeps an Apple silicon MacBook's battery at a charge limit, so it doesn't sit at 100% on the
-charger. Built and tested on an **M4 MacBook Air** (`Mac16,13`, battery firmware `20457.1.29`, macOS 26.7.1).
+<p align="center">Keeps your MacBook's battery at 80% (or any limit you pick) instead of 100%.</p>
 
-The limit is enforced by the battery firmware itself, so it keeps working while the Mac sleeps or the app is closed.
+## Install
+
+**[Download BatteryHealth.dmg](https://github.com/KaanEkimoz/BatteryHealth/releases/latest/download/BatteryHealth.dmg)** · Apple silicon Mac, macOS 14+
+
+Open the DMG, drag BatteryHealth to Applications, open it, then click the leaf in the menu bar → **Set Up…**
+
+Also set macOS's own limit to 100% (System Settings → Battery → Charging) so the two don't fight.
 
 <p align="center">
   <img src="docs/panel.png" width="316" alt="BatteryHealth panel, light appearance">
@@ -17,110 +22,51 @@ The limit is enforced by the battery firmware itself, so it keeps working while 
 
 ## Features
 
-- **Charge limit, 70–100%.** By default it holds the battery at the limit while plugged in: charging stops the
-  moment the menu bar shows the limit (e.g. exactly 80%), and the Mac then runs from the charger with the battery idle.
-  Optionally let it drop 3, 5 or 10% below the limit before charging again.
-- **Power Flow.** Live charger → Mac → battery watts. A charger only supplies what the Mac draws; its rating
-  (e.g. 35 W) is a maximum.
-- **MagSafe LED.** Green while held at the limit, orange while charging or discharging toward it.
-- **Heat Guard.** Pauses charging while the battery is above 35, 38 or 40 °C.
-- **Top Up.** Charge to 100% once, e.g. before a trip. The limit comes back when you unplug.
-- **Discharge.** Run from the battery while plugged in until it's down to the limit. Idle sleep is blocked meanwhile,
-  and the charger is always reconnected before sleep.
-- **Health.** Maximum capacity as macOS reports it, plus the raw measured capacity, cycle count and temperature.
-- **Uptime.** How long the Mac has been on since its last restart, with an optional reminder to restart after 72 hours.
-- **Time Left.** On battery, how long it lasts; while charging, how long until the limit.
-- **Your panel, your way.** Hover over a section or stat and click − to hide it, bring it back with + at the bottom of the panel, and drag the stat tiles to reorder them.
+- **Charge limit, 70–100%.** Charging stops the moment the menu bar shows your limit, and the Mac then runs straight
+  from the charger. Works while the Mac sleeps or the app is closed.
+- **Power Flow.** Live watts from charger to Mac to battery.
+- **Quick actions.** Top up to 100% once, discharge down to the limit, or pause charging when the battery is hot.
+- **Stats.** Health, capacity, cycles, temperature, uptime and time left. Each one is its own tile.
+- **MagSafe LED.** Green when held at the limit, orange while moving toward it.
+- **Restart reminder.** A notification once the Mac has been on for 3 days.
+- **Make it yours.** Hover a tile and click − to hide it, add it back with +, drag tiles to reorder.
 
-## Install
-
-Needs an Apple silicon Mac (M1 or later) on macOS 14 or newer.
-
-1. Download **BatteryHealth-x.y.dmg** from the [latest release](https://github.com/KaanEkimoz/BatteryHealth/releases/latest).
-2. Open it and drag **BatteryHealth** onto **Applications**.
-3. Open BatteryHealth from Applications. It's signed with a Developer ID and notarized by Apple, so it opens like
-   any other app.
-4. Click the leaf in the menu bar → **Set Up…** and enter your admin password once.
-
-Charge control is a small root service, the only part allowed to write to the battery controller:
-
-- `/Library/PrivilegedHelperTools/com.kaanusta.batteryhealth.daemon`
-- `/Library/LaunchDaemons/com.kaanusta.batteryhealth.daemon.plist`
-- settings: `/Library/Application Support/BatteryHealth/config.json`
-- log: `/var/log/batteryhealthd.log`
-
-**Turn off macOS's own charge limit** (System Settings → Battery → Charging → 100%). Both limits stop charging
-independently, and with both on the battery ends up a few percent under the limit. The panel warns you when macOS's
-limit is on.
-
-To remove everything: **⚙ Settings → Remove Charge Control…**, then delete the app.
-
-### Build from source
-
-Needs the Xcode command line tools (`xcode-select --install`, Swift 5.9+). Full Xcode isn't required.
-
-```bash
-scripts/build.sh release --install   # build, copy to /Applications and open
-scripts/make-dmg.sh                  # build, sign and notarize build/BatteryHealth-<version>.dmg
-```
+To uninstall: ⚙ Settings → **Remove Charge Control…**, then delete the app.
 
 ## How it works
 
-Charging is controlled through undocumented SMC keys, and Apple changes them with battery **firmware** updates, not
-macOS versions. On firmware 20457 the older charge-control keys are gone:
+Apple changes the battery's control keys with firmware updates, which is why older charge limiters stopped working.
+On current Apple silicon firmware BatteryHealth uses the battery's own charge range (`bfF0` / `bfD0` / `bfE0`), so the
+firmware enforces the limit itself. Older Macs fall back to switching charging on and off (`CHTE`, `CH0B` / `CH0C`).
 
-| Key | Purpose | On this Mac |
-| --- | --- | --- |
-| `BCLM` | Max charge (Intel Macs) | no |
-| `CH0B` / `CH0C` | Charge inhibit (older Apple silicon firmware) | no |
-| `CHTE` | Charge inhibit (macOS 26 / 15 firmware) | removed in 20457 |
-| `bfF0` / `bfD0` / `bfE0` | Firmware charge range: on/off, upper, lower | **yes** |
-| `CHIE` | Disconnect the charger (forced discharge) | yes |
-| `ACLC` | MagSafe LED colour | yes |
+A small root service (`/Library/PrivilegedHelperTools/com.kaanusta.batteryhealth.daemon`) is the only part that
+writes these keys. Thanks to [batt](https://github.com/charlie0129/batt) for documenting them.
 
-BatteryHealth picks the method from the keys that exist:
+<details>
+<summary>Build from source and command line</summary>
 
-1. **Firmware range** (`bfF0`/`bfD0`/`bfE0`): the battery firmware stops charging inside the range on its own.
-   Used on the M4.
-2. **Charge inhibit** (`CHTE`, or `CH0B` + `CH0C`): the daemon switches charging on and off, and pauses it before
-   sleep. Used on older firmware.
-3. Neither: monitoring only.
+Needs the Xcode command line tools (`xcode-select --install`).
 
-`bfD0`/`bfE0` are little-endian `ui32` percentages, written in the order off → upper → lower → on. Thanks to
-[batt](https://github.com/charlie0129/batt) for documenting them.
+```bash
+scripts/build.sh release --install   # build, copy to /Applications and open
+scripts/make-dmg.sh                  # build, sign and notarize the DMG
+```
 
-The firmware compares the range with the battery gauge's own state of charge, which runs 1–4 points below the
-percentage macOS shows. To make the menu bar land exactly on the limit, the daemon fixes the range at the gauge value
-the moment macOS shows the limit while charging. If the shown value later sits off the limit, it moves the target by
-one point at most every 15 minutes, and only while the battery is idle. The target never goes more than 4 points below
-the limit.
-
-## Command line
-
-The daemon binary doubles as a CLI. Settings changes go through the running daemon. With `sudo`, they also work when
-the daemon isn't running.
+The service binary is also a CLI:
 
 ```bash
 B=/Applications/BatteryHealth.app/Contents/Resources/batteryhealthd
-$B status            # battery, gauge, power flow, limiter state
-$B set 80            # hold at 80%
-$B gap 5             # charge again once 5% below the limit (1 = hold)
-$B heat 38           # pause charging above 38 °C (heat off to disable)
-$B topup             # 100% once
-$B discharge         # run on battery down to the limit
-$B led off           # leave the MagSafe LED to macOS
-$B keys              # list charge-related SMC keys
-sudo $B reset        # limiter off, everything back to stock
+$B status        # battery, power flow, limiter state
+$B set 80        # hold at 80%
+$B heat 38       # pause charging above 38 °C
+sudo $B reset    # turn the limit off, back to stock macOS charging
 ```
 
-Without the app: `sudo scripts/install-daemon.sh` / `sudo scripts/uninstall-daemon.sh`.
+Logs: `/var/log/batteryhealthd.log` · Settings: `/Library/Application Support/BatteryHealth/config.json`
+
+</details>
 
 ## Notes
 
-- **macOS's own limit** (macOS 26.4+) is a separate gate, and the lower of the two wins. macOS also charges to 100%
-  every few weeks to recalibrate. The firmware range set here is independent of that.
-- **Quitting the app doesn't remove the limit**, because it lives in the firmware. Use **⚙ Settings → Turn Off and Use macOS Charging**
-  or `batteryhealthd reset` for that.
-- On **macOS 27 beta 4+** firmware, Apple locks these keys behind a private entitlement, so even root gets
-  `kIOReturnNotPrivileged`. If that reaches this Mac, the panel shows the write error.
-- Writing to the SMC is undocumented. Use at your own risk.
+- Quitting the app doesn't remove the limit, because it lives in the firmware. Use ⚙ Settings → **Turn Off and Use macOS Charging**.
+- Tested on an M4 MacBook Air (firmware 20457, macOS 26.7). Writing to the battery controller is undocumented; use at your own risk.
