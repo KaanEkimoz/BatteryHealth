@@ -26,6 +26,10 @@ struct SettingsView: View {
                               subtitle: "Green when held, orange when moving",
                               isOn: binding(\.controlMagSafeLED))
                     Divider().padding(.leading, 12)
+                    ToggleRow(title: "Heat Guard",
+                              subtitle: "Pause charging while the battery is hot",
+                              isOn: binding(\.heatProtection))
+                    Divider().padding(.leading, 12)
                     HStack {
                         Text("Heat Guard Limit")
                             .font(.system(size: 12))
@@ -42,6 +46,8 @@ struct SettingsView: View {
                     }
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
+                    .disabled(!model.config.heatProtection)
+                    .opacity(model.config.heatProtection ? 1 : 0.45)
                 }
             }
 
