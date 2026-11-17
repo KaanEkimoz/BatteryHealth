@@ -24,7 +24,6 @@ struct SettingsView: View {
             if updater.isAvailable {
                 SettingsGroup("Updates") {
                     ToggleRow(title: "Install Updates Automatically",
-                              subtitle: "Checks GitHub once a day",
                               isOn: Binding(get: { updater.automaticallyInstalls },
                                             set: { updater.automaticallyInstalls = $0 }))
                     Divider().padding(.leading, 12)
