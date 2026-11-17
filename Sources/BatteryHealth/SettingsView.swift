@@ -6,8 +6,6 @@ import BatteryKit
 struct SettingsView: View {
     @ObservedObject var model: AppModel
     let onBack: () -> Void
-    @AppStorage(PanelLayout.hiddenKey) private var hiddenRaw = ""
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(alignment: .leading, spacing: Metrics.gap) {
@@ -45,20 +43,6 @@ struct SettingsView: View {
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
                 }
-            }
-
-            SettingsGroup("Show in Panel",
-                          footer: "Hover over a section to hide it with −, add it back with + at the bottom of the panel, and drag stats to reorder them.") {
-                LazyVGrid(columns: [GridItem(.flexible(), spacing: 6), GridItem(.flexible(), spacing: 6)], spacing: 6) {
-                    ForEach(PanelItem.allCases, id: \.self) { item in
-                        PanelChip(item: item, isOn: !layout.isHidden(item)) {
-                            var l = layout
-                            l.setHidden(item, !l.isHidden(item))
-                            withAnimation(reduceMotion ? .easeInOut(duration: 0.15) : calm) { hiddenRaw = l.hiddenRaw }
-                        }
-                    }
-                }
-                .padding(8)
             }
 
             SettingsGroup("Charge Control",
@@ -118,8 +102,6 @@ struct SettingsView: View {
         .padding(.top, 4)
         .padding(.bottom, 2)
     }
-
-    private var layout: PanelLayout { PanelLayout(hiddenRaw: hiddenRaw, orderRaw: "") }
 
     private var version: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
@@ -222,42 +204,6 @@ private struct ActionRow: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(RowPressStyle())
-    }
-}
-
-/// A toggle chip: filled while the item is on the panel.
-private struct PanelChip: View {
-    let item: PanelItem
-    let isOn: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 6) {
-                Image(systemName: item.symbol)
-                    .font(.system(size: 11, weight: .medium))
-                    .frame(width: 14)
-                Text(item.title)
-                    .font(.system(size: 11.5, weight: isOn ? .medium : .regular))
-                    .lineLimit(1)
-                Spacer(minLength: 0)
-                Image(systemName: isOn ? "checkmark" : "plus")
-                    .font(.system(size: 9.5, weight: .bold))
-                    .foregroundStyle(isOn ? Color.white.opacity(0.9) : Color.secondary)
-            }
-            .foregroundStyle(isOn ? Color.white : Color.primary)
-            .padding(.horizontal, 9)
-            .frame(height: 28)
-            .background(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(isOn ? AnyShapeStyle(Color.accentColor.gradient) : AnyShapeStyle(Color.primary.opacity(0.06)))
-            )
-            .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-        }
-        .buttonStyle(PressStyle())
-        .accessibilityLabel(item.title)
-        .accessibilityValue(isOn ? "Shown" : "Hidden")
-        .accessibilityAddTraits(isOn ? .isSelected : [])
     }
 }
 

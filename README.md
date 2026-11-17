@@ -29,7 +29,7 @@ The limit is enforced by the battery firmware itself, so it keeps working while 
   and the charger is always reconnected before sleep.
 - **Health.** Maximum capacity as macOS reports it, plus the raw measured capacity, cycle count and temperature.
 - **Uptime.** How long the Mac has been on since its last restart, with an optional reminder to restart after 72 hours.
-- **Your panel, your way.** Hover over a section or stat and click − to hide it, bring it back with + at the bottom of the panel (or Settings → Show in Panel), and drag stats to reorder them.
+- **Your panel, your way.** Hover over a section or stat and click − to hide it, bring it back with + at the bottom of the panel, and drag the stat tiles to reorder them.
 
 ## Install
 

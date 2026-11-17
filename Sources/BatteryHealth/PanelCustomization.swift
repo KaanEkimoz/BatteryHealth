@@ -1,5 +1,4 @@
 import SwiftUI
-import UniformTypeIdentifiers
 
 /// Parts of the panel people can hide. The charge limit itself always stays.
 enum PanelItem: String, CaseIterable {
@@ -122,24 +121,5 @@ extension View {
                         outside: Bool = true, remove: @escaping () -> Void) -> some View {
         modifier(HoverRemovable(item: item, alignment: alignment, badgeSize: badgeSize,
                                 outside: outside, remove: remove))
-    }
-}
-
-/// Live reordering: as a dragged stat passes over another, they swap places.
-struct StatDropDelegate: DropDelegate {
-    let target: PanelItem
-    @Binding var dragging: PanelItem?
-    let move: (PanelItem, PanelItem) -> Void
-
-    func dropEntered(info: DropInfo) {
-        guard let dragging, dragging != target else { return }
-        move(dragging, target)
-    }
-
-    func dropUpdated(info: DropInfo) -> DropProposal? { DropProposal(operation: .move) }
-
-    func performDrop(info: DropInfo) -> Bool {
-        dragging = nil
-        return true
     }
 }

@@ -20,6 +20,12 @@ struct PanelView: View {
     @AppStorage(PanelLayout.orderKey) private var orderRaw = ""
     @State var page: Page = .main
     @State private var dragging: PanelItem?
+    /// Stat tiles are all the same size in a 2-column grid, so a tile's slot
+    /// is computed from its index rather than measured mid-drag (a measured
+    /// frame would include the drag offset itself).
+    @State private var tileSize = CGSize(width: (Metrics.width - 24 - Metrics.gap) / 2, height: 74)
+    @State private var dragStartSlot = 0
+    @State private var dragTranslation: CGSize = .zero
 
     enum Page { case main, settings }
 
@@ -256,41 +262,95 @@ struct PanelView: View {
     }
 
     /// Each stat is its own small tile, two per row, like Control Center modules.
+    /// Tiles are placed by slot in one layer so a reorder slides them, across
+    /// rows too, instead of popping.
     @ViewBuilder
     private var healthModule: some View {
         if let b = model.battery {
             let items = statItems(b)
-            Grid(horizontalSpacing: Metrics.gap, verticalSpacing: Metrics.gap) {
-                ForEach(Array(stride(from: 0, to: items.count, by: 2)), id: \.self) { i in
-                    GridRow {
-                        ForEach(items[i..<min(i + 2, items.count)]) { s in
-                            statTile(s)
-                        }
-                        if i + 1 == items.count {
-                            Color.clear.gridCellUnsizedAxes([.horizontal, .vertical])
-                        }
-                    }
+            let rows = (items.count + 1) / 2
+            ZStack(alignment: .topLeading) {
+                ForEach(Array(items.enumerated()), id: \.element.id) { index, s in
+                    statTile(s, index: index, items: items)
+                        .frame(width: tileSize.width, height: tileSize.height)
+                        .offset(x: slotOrigin(index).x, y: slotOrigin(index).y)
                 }
+            }
+            .frame(width: Metrics.width - 24,
+                   height: CGFloat(rows) * tileSize.height + CGFloat(max(0, rows - 1)) * Metrics.gap,
+                   alignment: .topLeading)
+            .coordinateSpace(name: "stats")
+            .background(alignment: .topLeading) {
+                // Measures one tile's natural height; width is half the panel.
+                Module { Stat(label: "X", value: "0", detail: "x") }
+                    .frame(width: (Metrics.width - 24 - Metrics.gap) / 2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .hidden()
+                    .background(GeometryReader { geo in
+                        Color.clear
+                            .onAppear { tileSize = geo.size }
+                            .onChange(of: geo.size) { tileSize = $0 }
+                    })
             }
         } else {
             Module { Text("No battery found").foregroundStyle(.secondary) }
         }
     }
 
-    private func statTile(_ s: StatItem) -> some View {
-        Module {
+    private func slotOrigin(_ index: Int) -> CGPoint {
+        CGPoint(x: CGFloat(index % 2) * (tileSize.width + Metrics.gap),
+                y: CGFloat(index / 2) * (tileSize.height + Metrics.gap))
+    }
+
+    private func slot(at p: CGPoint, count: Int) -> Int? {
+        guard tileSize.width > 0, tileSize.height > 0, p.y >= 0 else { return nil }
+        let col = p.x < tileSize.width + Metrics.gap / 2 ? 0 : 1
+        let row = Int(p.y / (tileSize.height + Metrics.gap))
+        let i = row * 2 + col
+        return i < count ? i : nil
+    }
+
+    /// The dragged tile follows the pointer 1:1 from wherever it was grabbed;
+    /// the tile under the pointer gives up its slot and the rest slide over.
+    private func dragOffset(index: Int) -> CGSize {
+        let start = slotOrigin(dragStartSlot), now = slotOrigin(index)
+        return CGSize(width: start.x + dragTranslation.width - now.x,
+                      height: start.y + dragTranslation.height - now.y)
+    }
+
+    private func statTile(_ s: StatItem, index: Int, items: [StatItem]) -> some View {
+        let isDragged = dragging == s.item
+        return Module {
             Stat(label: s.item.title, value: s.value, detail: s.detail)
         }
-        .frame(maxHeight: .infinity)
-        .scaleEffect(dragging == s.item ? 0.96 : 1)
-        .opacity(dragging == s.item ? 0.5 : 1)
         .contentShape(RoundedRectangle(cornerRadius: Metrics.module, style: .continuous))
         .hoverRemovable(s.item, badgeSize: 16) { setHidden(s.item, true) }
-        .onDrag {
-            dragging = s.item
-            return NSItemProvider(object: s.item.rawValue as NSString)
-        }
-        .onDrop(of: [.text], delegate: StatDropDelegate(target: s.item, dragging: $dragging, move: move))
+        .scaleEffect(isDragged ? 1.04 : 1)
+        .shadow(color: .black.opacity(isDragged ? 0.22 : 0), radius: isDragged ? 10 : 0, y: isDragged ? 4 : 0)
+        .offset(isDragged ? dragOffset(index: index) : .zero)
+        .zIndex(isDragged ? 1 : 0)
+        .gesture(
+            DragGesture(minimumDistance: 3, coordinateSpace: .named("stats"))
+                .onChanged { g in
+                    if dragging == nil {
+                        dragStartSlot = index
+                        withAnimation(.spring(response: 0.2, dampingFraction: 1)) { dragging = s.item }
+                    }
+                    dragTranslation = g.translation
+                    if let t = slot(at: g.location, count: items.count), t != index {
+                        move(s.item, to: items[t].item)
+                        NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+                    }
+                }
+                .onEnded { _ in
+                    withAnimation(reduceMotion ? .easeInOut(duration: 0.15) : .spring(response: 0.3, dampingFraction: 0.85)) {
+                        dragging = nil
+                        dragTranslation = .zero
+                    }
+                }
+        )
+        .accessibilityAction(named: "Move Earlier") { if index > 0 { move(s.item, to: items[index - 1].item) } }
+        .accessibilityAction(named: "Move Later") { if index + 1 < items.count { move(s.item, to: items[index + 1].item) } }
     }
 
     private func macOSLimitWarning(_ limit: Int) -> some View {
