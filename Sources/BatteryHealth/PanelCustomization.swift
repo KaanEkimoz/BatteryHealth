@@ -10,14 +10,14 @@ enum PanelItem: String, CaseIterable {
 
     var title: String {
         switch self {
-        case .powerFlow: "Power Flow"
-        case .quickActions: "Actions"
-        case .health: "Health"
-        case .capacity: "Capacity"
-        case .cycles: "Cycles"
-        case .temperature: "Temperature"
-        case .uptime: "Uptime"
-        case .timeLeft: "Time Left"
+        case .powerFlow: L("Power Flow")
+        case .quickActions: L("Actions")
+        case .health: L("Health")
+        case .capacity: L("Capacity")
+        case .cycles: L("Cycles")
+        case .temperature: L("Temperature")
+        case .uptime: L("Uptime")
+        case .timeLeft: L("Time Left")
         }
     }
 
@@ -104,8 +104,8 @@ struct HoverRemovable: ViewModifier {
                     .offset(x: outside ? (alignment == .topTrailing ? 1 : -1) * badgeSize * 0.35 : 0,
                             y: outside ? -badgeSize * 0.35 : 0)
                     .transition(reduceMotion ? .opacity : .scale(scale: 0.6).combined(with: .opacity))
-                    .help("Hide \(item.title)")
-                    .accessibilityLabel("Hide \(item.title)")
+                    .help(L("Hide \(item.title)"))
+                    .accessibilityLabel(L("Hide \(item.title)"))
                 }
             }
             .onHover { inside in
@@ -114,7 +114,7 @@ struct HoverRemovable: ViewModifier {
                 }
             }
             // Keyboard / VoiceOver path to the same action.
-            .accessibilityAction(named: "Hide \(item.title)", remove)
+            .accessibilityAction(named: L("Hide \(item.title)"), remove)
     }
 }
 

@@ -69,13 +69,13 @@ struct PanelView: View {
         VStack(spacing: Metrics.gap) {
             hero
             if !model.installed {
-                InstallModule(busy: model.busy, title: "Set up charge limiting",
-                              detail: "BatteryHealth adds a small background service that writes your limit to the battery firmware, so it keeps working while the Mac sleeps or this app is closed. You’ll be asked for your password once.",
-                              button: "Set Up…") { model.installDaemon() }
+                InstallModule(busy: model.busy, title: L("Set up charge limiting"),
+                              detail: L("BatteryHealth adds a small background service that writes your limit to the battery firmware, so it keeps working while the Mac sleeps or this app is closed. You’ll be asked for your password once."),
+                              button: L("Set Up…")) { model.installDaemon() }
             } else if model.daemon == nil {
-                InstallModule(busy: model.busy, title: "Charge control isn’t responding",
-                              detail: model.daemonError ?? "The background service didn’t answer.",
-                              button: "Repair…") { model.installDaemon() }
+                InstallModule(busy: model.busy, title: L("Charge control isn’t responding"),
+                              detail: model.daemonError ?? L("The background service didn’t answer."),
+                              button: L("Repair…")) { model.installDaemon() }
             } else {
                 if let l = model.macOSLimit, model.config.limitEnabled { macOSLimitWarning(l) }
                 limitModule
@@ -104,7 +104,7 @@ struct PanelView: View {
                          tint: tint)
                 .frame(width: 58, height: 28)
             VStack(alignment: .leading, spacing: 1) {
-                Text("\(b?.percent ?? 0)%")
+                Text(pct(b?.percent ?? 0))
                     .font(.system(size: 30, weight: .semibold, design: .rounded))
                     .tracking(-0.6)
                     .monospacedDigit()
@@ -131,17 +131,33 @@ struct PanelView: View {
         return b.externalConnected ? .green : Color.primary.opacity(0.55)
     }
 
+    /// Built here rather than taken from the daemon's English state text, so
+    /// it follows the app's language.
     private var headline: String {
-        if let s = model.daemon?.state, !s.isEmpty { return s }
-        return model.installed ? "Charge control not responding" : "Charge limit not set up"
+        guard let d = model.daemon else {
+            return model.installed ? L("Charge control not responding") : L("Charge limit not set up")
+        }
+        guard let b = model.battery else { return L("No battery") }
+        let c = d.config
+        let limit = pct(c.upperLimit)
+        if d.backend == .unsupported { return L("Not supported on this Mac") }
+        if !c.limitEnabled || c.upperLimit >= 100 { return L("No limit – macOS charges normally") }
+        if c.topUpToFull { return b.percent >= 100 ? L("Topped up to \(pct(100))") : L("Topping up to \(pct(100))") }
+        if c.dischargeToLimit { return L("Discharging to \(limit)") }
+        if d.heatHold { return L("Paused: battery is \(String(format: "%.0f°", b.temperatureC))") }
+        if !b.externalConnected { return L("Limit \(limit) armed") }
+        if b.isCharging { return L("Charging to \(limit)") }
+        if b.percent > c.upperLimit { return L("Settling to \(limit)") }
+        if b.percent >= (c.holdsAtLimit ? c.upperLimit - 1 : c.lowerLimit) { return L("Holding at \(limit)") }
+        return L("Waiting to charge")
     }
 
     private var powerLine: String {
-        guard let b = model.battery else { return "No battery" }
-        var parts = [b.externalConnected ? (b.isCharging ? "Charging" : "Power adapter") : "Battery"]
+        guard let b = model.battery else { return L("No battery") }
+        var parts = [b.externalConnected ? (b.isCharging ? L("Charging") : L("Power adapter")) : L("Battery")]
         if abs(b.powerW) >= 0.5 { parts.append(String(format: "%.1f W", abs(b.powerW))) }
-        if let w = b.adapterWatts, b.externalConnected { parts.append("\(w) W charger") }
-        if !b.externalConnected, let m = b.timeRemainingMinutes { parts.append("\(m / 60):\(String(format: "%02d", m % 60)) left") }
+        if let w = b.adapterWatts, b.externalConnected { parts.append(L("\(w) W charger")) }
+        if !b.externalConnected, let m = b.timeRemainingMinutes { parts.append(L("\(shortDuration(minutes: m)) left")) }
         return parts.joined(separator: " · ")
     }
 
@@ -151,10 +167,10 @@ struct PanelView: View {
         Module {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
-                    Text("Charge Limit").font(.system(size: 13, weight: .semibold))
+                    Text(L("Charge Limit")).font(.system(size: 13, weight: .semibold))
                     Spacer()
                     if model.config.limitEnabled {
-                        Text("\(model.config.upperLimit)%")
+                        Text(pct(model.config.upperLimit))
                             .font(.system(size: 13, weight: .semibold, design: .rounded))
                             .monospacedDigit()
                             .foregroundStyle(.secondary)
@@ -169,22 +185,22 @@ struct PanelView: View {
                             enabled: model.config.limitEnabled)
                     .frame(height: 30)
                 HStack(spacing: 4) {
-                    Text(!model.config.limitEnabled ? "macOS charges normally"
-                         : model.config.holdsAtLimit ? "Holds at \(model.config.upperLimit)% on the charger"
-                         : "Stops at \(model.config.upperLimit)%, resumes below \(model.config.lowerLimit)%")
+                    Text(!model.config.limitEnabled ? L("macOS charges normally")
+                         : model.config.holdsAtLimit ? L("Holds at \(pct(model.config.upperLimit)) on the charger")
+                         : L("Stops at \(pct(model.config.upperLimit)), resumes below \(pct(model.config.lowerLimit))"))
                         .contentTransition(.numericText())
                     Spacer()
                     if model.config.limitEnabled {
                         Menu {
-                            Picker("Resume charging", selection: binding(\.restartGap)) {
-                                Text("Hold at limit").tag(1)
-                                Text("3% below limit").tag(3)
-                                Text("5% below limit").tag(5)
-                                Text("10% below limit").tag(10)
+                            Picker(L("Resume charging"), selection: binding(\.restartGap)) {
+                                Text(L("Hold at limit")).tag(1)
+                                Text(L("\(pct(3)) below limit")).tag(3)
+                                Text(L("\(pct(5)) below limit")).tag(5)
+                                Text(L("\(pct(10)) below limit")).tag(10)
                             }
                             .pickerStyle(.inline)
                         } label: {
-                            Text(model.config.holdsAtLimit ? "Hold" : "−\(model.config.restartGap)%")
+                            Text(model.config.holdsAtLimit ? L("Hold") : "−" + pct(model.config.restartGap))
                         }
                         .menuStyle(.borderlessButton).menuIndicator(.visible).fixedSize()
                     }
@@ -207,18 +223,18 @@ struct PanelView: View {
         let on = model.config.limitEnabled
         return Module {
             HStack(alignment: .top, spacing: 0) {
-                QuickToggle(symbol: "bolt.fill", title: "Top Up", subtitle: onAC ? "to 100% once" : "plug in first",
+                QuickToggle(symbol: "bolt.fill", title: L("Top Up"), subtitle: onAC ? L("to \(pct(100)) once") : L("plug in first"),
                             isOn: model.config.topUpToFull, tint: .green,
                             enabled: onAC && on) {
                     model.update { $0.topUpToFull.toggle(); if $0.topUpToFull { $0.dischargeToLimit = false } }
                 }
-                QuickToggle(symbol: "arrow.down.right", title: "Discharge", subtitle: onAC ? "to \(model.config.upperLimit)%" : "plug in first",
+                QuickToggle(symbol: "arrow.down.right", title: L("Discharge"), subtitle: onAC ? L("to \(pct(model.config.upperLimit))") : L("plug in first"),
                             isOn: model.config.dischargeToLimit, tint: .blue,
                             enabled: onAC && on && (b?.percent ?? 0) > model.config.upperLimit && model.daemon?.adapterKey != nil) {
                     model.update { $0.dischargeToLimit.toggle(); if $0.dischargeToLimit { $0.topUpToFull = false } }
                 }
-                QuickToggle(symbol: "thermometer.medium", title: "Heat Guard",
-                            subtitle: model.daemon?.heatHold == true ? "pausing now" : "above \(Int(model.config.heatLimitC))°C",
+                QuickToggle(symbol: "thermometer.medium", title: L("Heat Guard"),
+                            subtitle: model.daemon?.heatHold == true ? L("pausing now") : L("above \(Int(model.config.heatLimitC))°C"),
                             isOn: model.config.heatProtection, tint: .orange, enabled: true) {
                     model.update { $0.heatProtection.toggle() }
                 }
@@ -229,31 +245,32 @@ struct PanelView: View {
     // MARK: Health
 
     private func uptimeDetail(_ up: Uptime) -> String {
-        if up.hours >= RestartReminder.thresholdHours { return "Restart recommended" }
+        if up.hours >= RestartReminder.thresholdHours { return L("Restart recommended") }
         let f = DateFormatter()
-        f.dateFormat = Calendar.current.isDateInToday(up.bootDate) ? "'since' HH:mm" : "'since' EEE HH:mm"
-        return f.string(from: up.bootDate)
+        f.locale = appLocale
+        f.setLocalizedDateFormatFromTemplate(Calendar.current.isDateInToday(up.bootDate) ? "jmm" : "EEEjmm")
+        return L("since \(f.string(from: up.bootDate))")
     }
 
     private static func duration(_ minutes: Int) -> String {
-        minutes >= 60 ? "\(minutes / 60) h \(minutes % 60) m" : "\(minutes) m"
+        shortDuration(minutes: minutes)
     }
 
     /// On battery: macOS's estimate. Charging: time to the limit (or 100%),
     /// from the charge still missing and the current flowing in.
     private func timeLeft(_ b: BatterySnapshot) -> (value: String, detail: String) {
         if !b.externalConnected {
-            guard let m = b.timeRemainingMinutes else { return ("—", "Calculating…") }
-            return (Self.duration(m), "on battery")
+            guard let m = b.timeRemainingMinutes else { return ("—", L("Calculating…")) }
+            return (Self.duration(m), L("on battery"))
         }
         let target = model.config.limitEnabled && !model.config.topUpToFull ? model.config.upperLimit : 100
         if b.isCharging, b.amperageA > 0.05, b.percent < target {
             let missingmAh = Double(target - b.percent) / 100 * Double(max(b.nominalCapacity, b.rawMaxCapacity))
             let minutes = Int((missingmAh / (b.amperageA * 1000) * 60).rounded(.up))
-            return (Self.duration(max(1, minutes)), "to \(target)%")
+            return (Self.duration(max(1, minutes)), L("to \(pct(target))"))
         }
-        if b.isCharging { return ("—", "Calculating…") }
-        return b.percent >= target - 1 ? ("Held", "at \(target)% on power") : ("—", "on power adapter")
+        if b.isCharging { return ("—", L("Calculating…")) }
+        return b.percent >= target - 1 ? (L("Held"), L("at \(pct(target)) on power")) : ("—", L("on power adapter"))
     }
 
     private struct StatItem: Identifiable {
@@ -266,13 +283,13 @@ struct PanelView: View {
     private func statItems(_ b: BatterySnapshot) -> [StatItem] {
         let macOS = model.macOSHealth
         var all = [
-            StatItem(item: .health, value: macOS?.maximumCapacityPercent.map { "\($0)%" } ?? "—",
-                     detail: macOS?.condition ?? "System Settings"),
+            StatItem(item: .health, value: macOS?.maximumCapacityPercent.map(pct) ?? "—",
+                     detail: macOS?.condition.map { $0 == "Good" ? L("Good") : $0 } ?? L("System Settings")),
             StatItem(item: .capacity, value: "\(b.rawMaxCapacity) mAh",
-                     detail: String(format: "%.1f%% of %d", b.healthPercent, b.designCapacity)),
-            StatItem(item: .cycles, value: "\(b.cycleCount)", detail: "of 1000 rated"),
+                     detail: L("\(pct1(b.healthPercent)) of \(String(b.designCapacity))")),
+            StatItem(item: .cycles, value: "\(b.cycleCount)", detail: L("of 1000 rated")),
             StatItem(item: .temperature, value: String(format: "%.1f°", b.temperatureC),
-                     detail: b.temperatureC >= 35 ? "Warm" : "Normal"),
+                     detail: b.temperatureC >= 35 ? L("Warm") : L("Normal")),
         ]
         if let up = model.uptime {
             all.append(StatItem(item: .uptime, value: up.shortText, detail: uptimeDetail(up)))
@@ -316,7 +333,7 @@ struct PanelView: View {
                     })
             }
         } else {
-            Module { Text("No battery found").foregroundStyle(.secondary) }
+            Module { Text(L("No battery found")).foregroundStyle(.secondary) }
         }
     }
 
@@ -372,21 +389,21 @@ struct PanelView: View {
                     }
                 }
         )
-        .accessibilityAction(named: "Move Earlier") { if index > 0 { move(s.item, to: items[index - 1].item) } }
-        .accessibilityAction(named: "Move Later") { if index + 1 < items.count { move(s.item, to: items[index + 1].item) } }
+        .accessibilityAction(named: L("Move Earlier")) { if index > 0 { move(s.item, to: items[index - 1].item) } }
+        .accessibilityAction(named: L("Move Later")) { if index + 1 < items.count { move(s.item, to: items[index + 1].item) } }
     }
 
     private func macOSLimitWarning(_ limit: Int) -> some View {
         Module {
             VStack(alignment: .leading, spacing: 6) {
-                Label("macOS’s own \(limit)% limit is also on", systemImage: "exclamationmark.triangle.fill")
+                Label(L("macOS’s own \(pct(limit)) limit is also on"), systemImage: "exclamationmark.triangle.fill")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.orange)
-                Text("It waits for a bigger drop before charging again, so the battery can sit below your limit on the charger. Set it to 100% in Battery → Charging and let BatteryHealth hold the limit.")
+                Text(L("It waits for a bigger drop before charging again, so the battery can sit below your limit on the charger. Set it to \(pct(100)) in Battery → Charging and let BatteryHealth hold the limit."))
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-                Button("Open Battery Settings") { model.openBatterySettings() }
+                Button(L("Open Battery Settings")) { model.openBatterySettings() }
                     .controlSize(.small)
             }
         }
@@ -415,8 +432,8 @@ struct PanelView: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(PressStyle())
-            .help("Settings")
-            .accessibilityLabel("Settings")
+            .help(L("Settings"))
+            .accessibilityLabel(L("Settings"))
             .keyboardShortcut(",", modifiers: .command)
         }
         .padding(.horizontal, 4)
@@ -430,9 +447,9 @@ struct PanelView: View {
         let hidden = PanelItem.allCases.filter(layout.isHidden)
         return Menu {
             if hidden.isEmpty {
-                Text("Everything is on the panel")
+                Text(L("Everything is on the panel"))
             } else {
-                Section("Add to Panel") {
+                Section(L("Add to Panel")) {
                     ForEach(hidden, id: \.self) { item in
                         Button { setHidden(item, false) } label: {
                             Label(item.title, systemImage: item.symbol)
@@ -450,8 +467,8 @@ struct PanelView: View {
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
         .fixedSize()
-        .help(hidden.isEmpty ? "Everything is on the panel" : "Add to panel")
-        .accessibilityLabel("Add to panel")
+        .help(hidden.isEmpty ? L("Everything is on the panel") : L("Add to Panel"))
+        .accessibilityLabel(L("Add to Panel"))
     }
 
     private func binding<T>(_ kp: WritableKeyPath<ChargeConfig, T>) -> Binding<T> {
@@ -485,7 +502,7 @@ private struct Stat: View {
     let detail: String
     var body: some View {
         VStack(alignment: .leading, spacing: 1) {
-            Text(label.uppercased())
+            Text(label.uppercased(with: appLocale))
                 .font(.system(size: 9.5, weight: .semibold))
                 .tracking(0.4)
                 .foregroundStyle(.secondary)
@@ -537,7 +554,7 @@ private struct BatteryGlyph: View {
             }
         }
         .accessibilityElement()
-        .accessibilityLabel("Battery \(level) percent\(limit.map { ", limit \($0) percent" } ?? "")")
+        .accessibilityLabel(limit.map { L("Battery \(pct(level)), limit \(pct($0))") } ?? L("Battery \(pct(level))"))
     }
 }
 
@@ -601,8 +618,8 @@ private struct LimitSlider: View {
         }
         .opacity(enabled ? 1 : 0.6)
         .accessibilityElement()
-        .accessibilityLabel("Charge limit")
-        .accessibilityValue("\(value) percent")
+        .accessibilityLabel(L("Charge Limit"))
+        .accessibilityValue(pct(value))
         .accessibilityAdjustableAction { dir in
             guard enabled else { return }
             switch dir {
@@ -677,7 +694,7 @@ private struct InstallModule: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 Button(action: action) {
-                    Text(busy ? "Waiting…" : button).frame(maxWidth: .infinity)
+                    Text(busy ? L("Waiting…") : button).frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)

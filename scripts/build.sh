@@ -16,6 +16,7 @@ cp "$BIN/BatteryHealth" "$APP/Contents/MacOS/BatteryHealth"
 cp "$BIN/batteryhealthd" "$APP/Contents/Resources/batteryhealthd"
 cp Resources/com.kaanusta.batteryhealth.daemon.plist "$APP/Contents/Resources/"
 cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
+for lproj in Resources/Localization/*.lproj; do ditto "$lproj" "$APP/Contents/Resources/$(basename "$lproj")"; done
 mkdir -p "$APP/Contents/Frameworks"
 ditto "$BIN/Sparkle.framework" "$APP/Contents/Frameworks/Sparkle.framework"
 

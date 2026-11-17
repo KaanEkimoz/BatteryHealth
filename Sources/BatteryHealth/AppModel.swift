@@ -101,7 +101,7 @@ final class AppModel: ObservableObject {
 
     func resetToStock() {
         client.reset { [weak self] error in
-            self?.message = error ?? "Stock macOS charging restored"
+            self?.message = error ?? L("Stock macOS charging restored")
             self?.refresh()
         }
     }
@@ -139,7 +139,7 @@ final class AppModel: ObservableObject {
         do {
             if on { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
         } catch {
-            message = "Login item: \(error.localizedDescription)"
+            message = L("Login item: \(error.localizedDescription)")
         }
         launchAtLogin = SMAppService.mainApp.status == .enabled
     }

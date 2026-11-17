@@ -27,7 +27,7 @@ enum Installer {
         install -d -o root -g wheel -m 755 \(q(BatteryHealthIDs.configDir))
         launchctl bootstrap system \(q(BatteryHealthIDs.plistPath))
         """
-        return runAsAdmin(script, prompt: "BatteryHealth wants to set up charge control.")
+        return runAsAdmin(script, prompt: L("BatteryHealth wants to set up charge control."))
     }
 
     static func uninstall() -> String? {
@@ -37,7 +37,7 @@ enum Installer {
         launchctl bootout system/\(label) 2>/dev/null || true
         rm -f \(q(BatteryHealthIDs.plistPath)) \(q(BatteryHealthIDs.daemonPath))
         """
-        return runAsAdmin(script, prompt: "BatteryHealth wants to remove charge control.")
+        return runAsAdmin(script, prompt: L("BatteryHealth wants to remove charge control."))
     }
 
     private static func runAsAdmin(_ shell: String, prompt: String) -> String? {
@@ -46,7 +46,7 @@ enum Installer {
         var err: NSDictionary?
         NSAppleScript(source: source)?.executeAndReturnError(&err)
         if let err {
-            if (err[NSAppleScript.errorNumber] as? Int) == -128 { return "Cancelled" }
+            if (err[NSAppleScript.errorNumber] as? Int) == -128 { return L("Cancelled") }
             return err[NSAppleScript.errorMessage] as? String ?? "Admin script failed"
         }
         return nil

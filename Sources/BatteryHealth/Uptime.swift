@@ -16,9 +16,7 @@ struct Uptime {
 
     /// "1 h 12 m" under a day, "52 h" under three days, "3 d 4 h" after.
     var shortText: String {
-        let h = hours
-        if h < 24 { return "\(h) h \(Int(interval / 60) % 60) m" }
-        return h < 72 ? "\(h) h" : "\(h / 24) d \(h % 24) h"
+        shortDuration(minutes: Int(interval / 60))
     }
 }
 
@@ -64,8 +62,8 @@ final class RestartReminder {
     func post(days: Int) {
         guard canNotify else { return }
         let content = UNMutableNotificationContent()
-        content.title = "Mac \(days) gündür açık"
-        content.body = "Yeniden başlatma öneriliyor."
+        content.title = L("Your Mac has been on for \(days) days")
+        content.body = L("A restart is recommended.")
         content.sound = .default
         let request = UNNotificationRequest(identifier: "restart-reminder", content: content, trigger: nil)
         UNUserNotificationCenter.current().add(request) { _ in }

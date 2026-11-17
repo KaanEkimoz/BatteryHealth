@@ -30,6 +30,7 @@ Also set macOS's own limit to 100% (System Settings → Battery → Charging) so
 - **MagSafe LED.** Green when held at the limit, orange while moving toward it.
 - **Restart reminder.** A notification once the Mac has been on for 3 days.
 - **Make it yours.** Hover a tile and click − to hide it, add it back with +, drag tiles to reorder.
+- **English, Türkçe, Español.** Follows your Mac's language.
 - **Updates itself.** New versions install from GitHub releases, signed and verified (via [Sparkle](https://sparkle-project.org)). Turn on automatic installs in ⚙ Settings.
 
 To uninstall: ⚙ Settings → **Remove Charge Control…**, then delete the app.

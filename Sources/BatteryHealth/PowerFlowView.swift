@@ -18,21 +18,21 @@ struct PowerFlowModule: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("Power Flow").font(.system(size: 13, weight: .semibold))
+                Text(L("Power Flow")).font(.system(size: 13, weight: .semibold))
                 Spacer()
                 Text(summary).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(1)
             }
             HStack(spacing: 0) {
                 Node(symbol: "powerplug.fill",
-                     title: battery.externalConnected ? battery.adapterWatts.map { "of \($0) W charger" } ?? "Charger" : "Charger",
+                     title: battery.externalConnected ? battery.adapterWatts.map { L("of \($0) W charger") } ?? L("Charger") : L("Charger"),
                      value: battery.externalConnected ? watts(adapterW) : "—",
                      active: chargerDir != .none, tint: .green)
                 FlowLine(direction: chargerDir == .forward ? 1 : 0, tint: .green)
                 Node(symbol: "laptopcomputer", title: "Mac", value: watts(systemW), active: true, tint: .primary)
                 FlowLine(direction: batteryDir == .forward ? 1 : batteryDir == .backward ? -1 : 0,
                          tint: batteryDir == .backward ? .orange : .green)
-                Node(symbol: batterySymbol, title: "Battery",
-                     value: batteryDir == .none ? "idle" : (batteryW > 0 ? "+" : "−") + watts(abs(batteryW)),
+                Node(symbol: batterySymbol, title: L("Battery"),
+                     value: batteryDir == .none ? L("idle") : (batteryW > 0 ? "+" : "−") + watts(abs(batteryW)),
                      active: batteryDir != .none, tint: batteryDir == .backward ? .orange : .green)
             }
         }
@@ -49,10 +49,10 @@ struct PowerFlowModule: View {
 
     private var summary: String {
         switch (battery.externalConnected, batteryDir) {
-        case (true, .none): return "Battery bypassed"
-        case (true, .forward): return "Charging"
-        case (true, .backward): return adapterW < 0.5 ? "Settling to limit on battery" : "Charger + battery"
-        case (false, _): return "On battery"
+        case (true, .none): return L("Battery bypassed")
+        case (true, .forward): return L("Charging")
+        case (true, .backward): return adapterW < 0.5 ? L("Settling to limit on battery") : L("Charger + battery")
+        case (false, _): return L("On battery")
         }
     }
 

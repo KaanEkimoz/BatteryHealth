@@ -12,38 +12,38 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: Metrics.gap) {
             header
 
-            SettingsGroup("General") {
-                ToggleRow(title: "Open at Login",
+            SettingsGroup(L("General")) {
+                ToggleRow(title: L("Open at Login"),
                           isOn: Binding(get: { model.launchAtLogin }, set: { model.setLaunchAtLogin($0) }))
                 Divider().padding(.leading, 12)
-                ToggleRow(title: "Restart Reminder",
-                          subtitle: "Notify after \(RestartReminder.thresholdHours) hours on",
+                ToggleRow(title: L("Restart Reminder"),
+                          subtitle: L("Notify after \(RestartReminder.thresholdHours / 24) days on"),
                           isOn: Binding(get: { model.restartReminderEnabled }, set: { model.setRestartReminder($0) }))
             }
 
             if updater.isAvailable {
-                SettingsGroup("Updates") {
-                    ToggleRow(title: "Install Updates Automatically",
+                SettingsGroup(L("Updates")) {
+                    ToggleRow(title: L("Install Updates Automatically"),
                               isOn: Binding(get: { updater.automaticallyInstalls },
                                             set: { updater.automaticallyInstalls = $0 }))
                     Divider().padding(.leading, 12)
-                    ActionRow(title: "Check for Updates…") { updater.checkForUpdates() }
+                    ActionRow(title: L("Check for Updates…")) { updater.checkForUpdates() }
                         .disabled(!updater.canCheck)
                 }
             }
 
             if model.installed {
-                SettingsGroup("Charging") {
-                    ToggleRow(title: "MagSafe LED Shows Limit",
-                              subtitle: "Green when held, orange when moving",
+                SettingsGroup(L("Charging Options")) {
+                    ToggleRow(title: L("MagSafe LED Shows Limit"),
+                              subtitle: L("Green when held, orange when moving"),
                               isOn: binding(\.controlMagSafeLED))
                     Divider().padding(.leading, 12)
-                    ToggleRow(title: "Heat Guard",
-                              subtitle: "Pause charging while the battery is hot",
+                    ToggleRow(title: L("Heat Guard"),
+                              subtitle: L("Pause charging while the battery is hot"),
                               isOn: binding(\.heatProtection))
                     Divider().padding(.leading, 12)
                     HStack {
-                        Text("Heat Guard Limit")
+                        Text(L("Heat Guard Limit"))
                             .font(.system(size: 12))
                         Spacer()
                         Picker("", selection: binding(\.heatLimitC)) {
@@ -63,8 +63,8 @@ struct SettingsView: View {
                 }
             }
 
-            SettingsGroup("Charge Control",
-                          footer: "A small background service writes your limit to the battery firmware, so it keeps working while the Mac sleeps or this app is closed. Setting it up asks for your password once.") {
+            SettingsGroup(L("Charge Control"),
+                          footer: L("A small background service writes your limit to the battery firmware, so it keeps working while the Mac sleeps or this app is closed. Setting it up asks for your password once.")) {
                 HStack(spacing: 6) {
                     Circle().fill(helperColor).frame(width: 6, height: 6)
                     Text(helperText).font(.system(size: 12))
@@ -74,13 +74,13 @@ struct SettingsView: View {
                 .padding(.vertical, 9)
                 Divider().padding(.leading, 12)
                 if model.installed {
-                    ActionRow(title: "Turn Off and Use macOS Charging") { model.resetToStock() }
+                    ActionRow(title: L("Turn Off and Use macOS Charging")) { model.resetToStock() }
                     Divider().padding(.leading, 12)
-                    ActionRow(title: model.needsDaemonUpdate ? "Update Charge Control…" : "Repair Charge Control…") { model.installDaemon() }
+                    ActionRow(title: model.needsDaemonUpdate ? L("Update Charge Control…") : L("Repair Charge Control…")) { model.installDaemon() }
                     Divider().padding(.leading, 12)
-                    ActionRow(title: "Remove Charge Control…", role: .destructive) { model.uninstallDaemon() }
+                    ActionRow(title: L("Remove Charge Control…"), role: .destructive) { model.uninstallDaemon() }
                 } else {
-                    ActionRow(title: "Set Up Charge Control…") { model.installDaemon() }
+                    ActionRow(title: L("Set Up Charge Control…")) { model.installDaemon() }
                 }
             }
 
@@ -89,7 +89,7 @@ struct SettingsView: View {
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                 Spacer()
-                Button("Quit") { NSApplication.shared.terminate(nil) }
+                Button(L("Quit")) { NSApplication.shared.terminate(nil) }
                     .keyboardShortcut("q")
                     .controlSize(.small)
             }
@@ -104,7 +104,7 @@ struct SettingsView: View {
             Button(action: onBack) {
                 HStack(spacing: 3) {
                     Image(systemName: "chevron.left").font(.system(size: 12, weight: .semibold))
-                    Text("Back").font(.system(size: 12))
+                    Text(L("Back")).font(.system(size: 12))
                 }
                 .foregroundStyle(Color.accentColor)
                 .contentShape(Rectangle())
@@ -114,7 +114,7 @@ struct SettingsView: View {
             Spacer()
         }
         .overlay {
-            Text("Settings").font(.system(size: 13, weight: .semibold))
+            Text(L("Settings")).font(.system(size: 13, weight: .semibold))
         }
         .padding(.horizontal, 6)
         .padding(.top, 4)
@@ -131,10 +131,10 @@ struct SettingsView: View {
     }
 
     private var helperText: String {
-        guard model.installed else { return "Not set up" }
-        guard model.daemon != nil else { return "Not responding" }
-        if model.needsDaemonUpdate { return "Update available" }
-        return "Active"
+        guard model.installed else { return L("Not set up") }
+        guard model.daemon != nil else { return L("Not responding") }
+        if model.needsDaemonUpdate { return L("Update available") }
+        return L("Active")
     }
 
     private func binding<T>(_ kp: WritableKeyPath<ChargeConfig, T>) -> Binding<T> {
@@ -156,7 +156,7 @@ private struct SettingsGroup<Content: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(title.uppercased())
+            Text(title.uppercased(with: appLocale))
                 .font(.system(size: 9.5, weight: .semibold))
                 .tracking(0.4)
                 .foregroundStyle(.secondary)
