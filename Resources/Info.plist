@@ -8,10 +8,16 @@
 	<key>CFBundleName</key><string>BatteryHealth</string>
 	<key>CFBundleDisplayName</key><string>BatteryHealth</string>
 	<key>CFBundlePackageType</key><string>APPL</string>
-	<key>CFBundleShortVersionString</key><string>1.0</string>
-	<key>CFBundleVersion</key><string>1</string>
+	<key>CFBundleShortVersionString</key><string>1.1</string>
+	<key>CFBundleVersion</key><string>2</string>
 	<key>LSMinimumSystemVersion</key><string>14.0</string>
 	<key>LSUIElement</key><true/>
+	<!-- Sparkle: the feed always points at the newest GitHub release's appcast. -->
+	<key>SUFeedURL</key><string>https://github.com/KaanEkimoz/BatteryHealth/releases/latest/download/appcast.xml</string>
+	<key>SUPublicEDKey</key><string>HJ2sVsbQuxbSYoQataGP0ZeO23K6vIHBzl0aD1RFtKU=</string>
+	<key>SUEnableAutomaticChecks</key><true/>
+	<key>SUScheduledCheckInterval</key><integer>86400</integer>
+	<key>SUEnableSystemProfiling</key><false/>
 	<key>NSHumanReadableCopyright</key><string>Battery charge limiter for Apple silicon MacBooks</string>
 </dict>
 </plist>

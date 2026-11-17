@@ -16,6 +16,8 @@ cp "$BIN/BatteryHealth" "$APP/Contents/MacOS/BatteryHealth"
 cp "$BIN/batteryhealthd" "$APP/Contents/Resources/batteryhealthd"
 cp Resources/com.kaanusta.batteryhealth.daemon.plist "$APP/Contents/Resources/"
 cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
+mkdir -p "$APP/Contents/Frameworks"
+ditto "$BIN/Sparkle.framework" "$APP/Contents/Frameworks/Sparkle.framework"
 
 # Developer ID + hardened runtime when the certificate is in the keychain
 # (needed for notarization); otherwise ad-hoc, enough to run locally.
@@ -25,6 +27,13 @@ if [[ -n "$IDENTITY" ]]; then
 else
     SIGN=(--force --sign -)
 fi
+# Sparkle's helpers are signed inside-out, as Sparkle's docs describe.
+SPK="$APP/Contents/Frameworks/Sparkle.framework/Versions/B"
+codesign "${SIGN[@]}" "$SPK/XPCServices/Installer.xpc"
+codesign "${SIGN[@]}" --preserve-metadata=entitlements "$SPK/XPCServices/Downloader.xpc"
+codesign "${SIGN[@]}" "$SPK/Autoupdate"
+codesign "${SIGN[@]}" "$SPK/Updater.app"
+codesign "${SIGN[@]}" "$APP/Contents/Frameworks/Sparkle.framework"
 codesign "${SIGN[@]}" "$APP/Contents/Resources/batteryhealthd"
 codesign "${SIGN[@]}" "$APP"
 echo "Signed with: ${IDENTITY:-ad-hoc}"

@@ -6,6 +6,7 @@ struct BatteryHealthApp: App {
     @StateObject private var model = AppModel()
 
     init() {
+        _ = Updater.shared  // starts Sparkle's scheduled checks
         // Debug aid: `BatteryHealth --snapshot out.png` renders the panel and exits.
         let args = CommandLine.arguments
         if let i = args.firstIndex(of: "--snapshot"), i + 1 < args.count {

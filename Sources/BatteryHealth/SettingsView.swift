@@ -5,6 +5,7 @@ import BatteryKit
 /// grouped rows, one level deep, back chevron at the top-left.
 struct SettingsView: View {
     @ObservedObject var model: AppModel
+    @ObservedObject private var updater = Updater.shared
     let onBack: () -> Void
 
     var body: some View {
@@ -18,6 +19,18 @@ struct SettingsView: View {
                 ToggleRow(title: "Restart Reminder",
                           subtitle: "Notify after \(RestartReminder.thresholdHours) hours on",
                           isOn: Binding(get: { model.restartReminderEnabled }, set: { model.setRestartReminder($0) }))
+            }
+
+            if updater.isAvailable {
+                SettingsGroup("Updates") {
+                    ToggleRow(title: "Install Updates Automatically",
+                              subtitle: "Checks GitHub once a day",
+                              isOn: Binding(get: { updater.automaticallyInstalls },
+                                            set: { updater.automaticallyInstalls = $0 }))
+                    Divider().padding(.leading, 12)
+                    ActionRow(title: "Check for Updates…") { updater.checkForUpdates() }
+                        .disabled(!updater.canCheck)
+                }
             }
 
             if model.installed {
