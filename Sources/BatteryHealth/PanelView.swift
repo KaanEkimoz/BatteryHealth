@@ -255,44 +255,42 @@ struct PanelView: View {
             .sorted { order.firstIndex(of: $0.item)! < order.firstIndex(of: $1.item)! }
     }
 
+    /// Each stat is its own small tile, two per row, like Control Center modules.
+    @ViewBuilder
     private var healthModule: some View {
-        Module {
-            if let b = model.battery {
-                let items = statItems(b)
-                Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 12) {
-                    ForEach(Array(stride(from: 0, to: items.count, by: 2)), id: \.self) { i in
-                        GridRow {
-                            ForEach(items[i..<min(i + 2, items.count)]) { s in
-                                Stat(label: s.item.title, value: s.value, detail: s.detail)
-                                    .padding(4)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                            .fill(.primary.opacity(dragging == s.item ? 0.08 : 0))
-                                    )
-                                    .padding(-4)
-                                    .opacity(dragging == s.item ? 0.5 : 1)
-                                    .contentShape(Rectangle())
-                                    .hoverRemovable(s.item, alignment: .topTrailing, badgeSize: 16, outside: false) {
-                                        setHidden(s.item, true)
-                                    }
-                                    .onDrag {
-                                        dragging = s.item
-                                        return NSItemProvider(object: s.item.rawValue as NSString)
-                                    }
-                                    .onDrop(of: [.text], delegate: StatDropDelegate(target: s.item, dragging: $dragging,
-                                                                                    move: move))
-                            }
-                            if i + 1 == items.count {
-                                Color.clear.gridCellUnsizedAxes([.horizontal, .vertical])
-                            }
+        if let b = model.battery {
+            let items = statItems(b)
+            Grid(horizontalSpacing: Metrics.gap, verticalSpacing: Metrics.gap) {
+                ForEach(Array(stride(from: 0, to: items.count, by: 2)), id: \.self) { i in
+                    GridRow {
+                        ForEach(items[i..<min(i + 2, items.count)]) { s in
+                            statTile(s)
+                        }
+                        if i + 1 == items.count {
+                            Color.clear.gridCellUnsizedAxes([.horizontal, .vertical])
                         }
                     }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            } else {
-                Text("No battery found").foregroundStyle(.secondary)
             }
+        } else {
+            Module { Text("No battery found").foregroundStyle(.secondary) }
         }
+    }
+
+    private func statTile(_ s: StatItem) -> some View {
+        Module {
+            Stat(label: s.item.title, value: s.value, detail: s.detail)
+        }
+        .frame(maxHeight: .infinity)
+        .scaleEffect(dragging == s.item ? 0.96 : 1)
+        .opacity(dragging == s.item ? 0.5 : 1)
+        .contentShape(RoundedRectangle(cornerRadius: Metrics.module, style: .continuous))
+        .hoverRemovable(s.item, badgeSize: 16) { setHidden(s.item, true) }
+        .onDrag {
+            dragging = s.item
+            return NSItemProvider(object: s.item.rawValue as NSString)
+        }
+        .onDrop(of: [.text], delegate: StatDropDelegate(target: s.item, dragging: $dragging, move: move))
     }
 
     private func macOSLimitWarning(_ limit: Int) -> some View {
